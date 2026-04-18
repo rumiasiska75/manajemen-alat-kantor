@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Alat Kantor</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <i class="fas fa-boxes"></i>
+                    <h1>Manajemen Alat Kantor</h1>
+                    <p>Sistem Keluar Masuk Alat dengan QR Code</p>
+                </div>
+                <form id="loginForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="loginUsername">
+                            <i class="fas fa-user"></i> Username atau Email
+                        </label>
+                        <input type="text" id="loginUsername" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <div class="password-input">
+                            <input type="password" id="loginPassword" name="password" required>
+                            <button type="button" class="toggle-password" onclick="togglePassword('loginPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </form>
+                <div class="auth-footer">
+                    <p>Belum punya akun? <a href="#" onclick="showPage('registerPage')">Daftar di sini</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Page -->
+    <div id="registerPage" class="page">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <i class="fas fa-user-plus"></i>
+                    <h1>Daftar Akun Baru</h1>
+                    <p>Buat akun untuk meminjam alat kantor</p>
+                </div>
+                <form id="registerForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="registerUsername">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <input type="text" id="registerUsername" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <input type="email" id="registerEmail" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerFullName">
+                            <i class="fas fa-id-card"></i> Nama Lengkap
+                        </label>
+                        <input type="text" id="registerFullName" name="full_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPhone">
+                            <i class="fas fa-phone"></i> No. Telepon
+                        </label>
+                        <input type="tel" id="registerPhone" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <div class="password-input">
+                            <input type="password" id="registerPassword" name="password" required minlength="6">
+                            <button type="button" class="toggle-password" onclick="togglePassword('registerPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small>Minimal 6 karakter</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerConfirmPassword">
+                            <i class="fas fa-lock"></i> Konfirmasi Password
+                        </label>
+                        <div class="password-input">
+                            <input type="password" id="registerConfirmPassword" name="confirm_password" required>
+                            <button type="button" class="toggle-password" onclick="togglePassword('registerConfirmPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-user-plus"></i> Daftar
+                    </button>
+                </form>
+                <div class="auth-footer">
+                    <p>Sudah punya akun? <a href="#" onclick="showPage('loginPage')">Login di sini</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" class="page">
+        <nav class="navbar">
+            <div class="navbar-brand">
+                <i class="fas fa-boxes"></i>
+                <span>Manajemen Alat Kantor</span>
+            </div>
+            <div class="navbar-menu">
+                <a href="#" onclick="showAdminSection('dashboardSection')" class="navbar-item">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="#" onclick="showAdminSection('toolsSection')" class="navbar-item">
+                    <i class="fas fa-toolbox"></i> Alat
+                </a>
+                <a href="#" onclick="showAdminSection('borrowingsSection')" class="navbar-item">
+                    <i class="fas fa-exchange-alt"></i> Peminjaman
+                </a>
+                <a href="#" onclick="showAdminSection('usersSection')" class="navbar-item">
+                    <i class="fas fa-users"></i> Pengguna
+                </a>
+            </div>
+            <div class="navbar-user">
+                <span id="adminUserName"></span>
+                <button class="btn btn-sm btn-outline" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Dashboard Section -->
+            <section id="dashboardSection" class="admin-section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-line"></i> Dashboard</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #4CAF50;">
+                            <i class="fas fa-toolbox"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="statTotalTools">0</h3>
+                            <p>Total Alat</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #2196F3;">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="statAvailableTools">0</h3>
+                            <p>Alat Tersedia</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #FF9800;">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="statActiveBorrowings">0</h3>
+                            <p>Peminjaman Aktif</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #9C27B0;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="statTotalUsers">0</h3>
+                            <p>Total Pengguna</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="activity-section">
+                    <h3><i class="fas fa-history"></i> Aktivitas Terbaru</h3>
+                    <div id="recentActivities" class="activity-list">
+                        <!-- Activities will be loaded here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tools Section -->
+            <section id="toolsSection" class="admin-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-toolbox"></i> Manajemen Alat</h2>
+                    <button class="btn btn-primary" onclick="showAddToolModal()">
+                        <i class="fas fa-plus"></i> Tambah Alat
+                    </button>
+                </div>
+
+                <div class="filters-bar">
+                    <input type="text" id="toolSearchInput" placeholder="Cari alat..." onkeyup="filterTools()">
+                    <select id="categoryFilter" onchange="filterTools()">
+                        <option value="">Semua Kategori</option>
+                    </select>
+                    <select id="conditionFilter" onchange="filterTools()">
+                        <option value="">Semua Kondisi</option>
+                        <option value="baik">Baik</option>
+                        <option value="rusak ringan">Rusak Ringan</option>
+                        <option value="rusak berat">Rusak Berat</option>
+                    </select>
+                </div>
+
+                <div id="toolsList" class="tools-grid">
+                    <!-- Tools will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Borrowings Section -->
+            <section id="borrowingsSection" class="admin-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-exchange-alt"></i> Daftar Peminjaman</h2>
+                </div>
+
+                <div class="filters-bar">
+                    <select id="borrowingStatusFilter" onchange="loadBorrowings()">
+                        <option value="">Semua Status</option>
+                        <option value="active">Aktif</option>
+                        <option value="pending">Pending</option>
+                        <option value="returned">Dikembalikan</option>
+                        <option value="cancelled">Dibatalkan</option>
+                    </select>
+                </div>
+
+                <div id="borrowingsList" class="borrowings-list">
+                    <!-- Borrowings will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Users Section -->
+            <section id="usersSection" class="admin-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-users"></i> Daftar Pengguna</h2>
+                </div>
+                <div id="usersList" class="users-list">
+                    <!-- Users will be loaded here -->
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- User Dashboard -->
+    <div id="userDashboard" class="page">
+        <nav class="navbar">
+            <div class="navbar-brand">
+                <i class="fas fa-boxes"></i>
+                <span>Manajemen Alat Kantor</span>
+            </div>
+            <div class="navbar-menu">
+                <a href="#" onclick="showUserSection('userDashboardSection')" class="navbar-item">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+                <a href="#" onclick="showUserSection('borrowToolsSection')" class="navbar-item">
+                    <i class="fas fa-qrcode"></i> Pinjam Alat
+                </a>
+                <a href="#" onclick="showUserSection('myBorrowingsSection')" class="navbar-item">
+                    <i class="fas fa-history"></i> Riwayat
+                </a>
+            </div>
+            <div class="navbar-user">
+                <span id="userUserName"></span>
+                <button class="btn btn-sm btn-outline" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- User Dashboard Section -->
+            <section id="userDashboardSection" class="user-section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-home"></i> Dashboard</h2>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #FF9800;">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="userStatActive">0</h3>
+                            <p>Peminjaman Aktif</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #4CAF50;">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="userStatReturned">0</h3>
+                            <p>Sudah Dikembalikan</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #2196F3;">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="userStatTotal">0</h3>
+                            <p>Total Peminjaman</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Aksi Cepat</h3>
+                    <div class="actions-grid">
+                        <button class="action-card" onclick="showUserSection('borrowToolsSection')">
+                            <i class="fas fa-qrcode"></i>
+                            <span>Pinjam Alat</span>
+                        </button>
+                        <button class="action-card" onclick="showUserSection('myBorrowingsSection')">
+                            <i class="fas fa-history"></i>
+                            <span>Lihat Riwayat</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="activity-section">
+                    <h3><i class="fas fa-list"></i> Peminjaman Terbaru</h3>
+                    <div id="userRecentBorrowings" class="borrowings-list">
+                        <!-- Recent borrowings will be loaded here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Borrow Tools Section -->
+            <section id="borrowToolsSection" class="user-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-qrcode"></i> Pinjam Alat</h2>
+                </div>
+
+                <div class="borrow-container">
+                    <div class="scan-section">
+                        <div class="scan-card">
+                            <h3><i class="fas fa-qrcode"></i> Scan QR Code Alat</h3>
+                            <div id="qrReader" class="qr-reader"></div>
+                            <p class="scan-info">Arahkan kamera ke QR Code pada alat yang ingin dipinjam</p>
+                            <button class="btn btn-secondary" onclick="toggleQRScanner()">
+                                <i class="fas fa-camera"></i> <span id="scannerToggleText">Mulai Scan</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cart-section">
+                        <div class="cart-card">
+                            <h3>
+                                <i class="fas fa-shopping-cart"></i> Keranjang Peminjaman
+                                <span id="cartCount" class="badge">0</span>
+                            </h3>
+                            <div id="cartItems" class="cart-items">
+                                <div class="empty-state">
+                                    <i class="fas fa-shopping-cart"></i>
+                                    <p>Keranjang kosong</p>
+                                    <small>Scan QR Code alat untuk menambahkan</small>
+                                </div>
+                            </div>
+                            <div id="cartActions" class="cart-actions hidden">
+                                <div class="form-group">
+                                    <label>Tanggal Pengembalian (Opsional)</label>
+                                    <input type="date" id="expectedReturnDate">
+                                </div>
+                                <div class="form-group">
+                                    <label>Catatan (Opsional)</label>
+                                    <textarea id="borrowNotes" rows="3" placeholder="Tambahkan catatan..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Foto Alat yang Dipinjam</label>
+                                    <input type="file" id="borrowPhoto" accept="image/*" capture="environment">
+                                    <small>Ambil foto semua alat yang akan dipinjam</small>
+                                </div>
+                                <button class="btn btn-primary btn-block" onclick="checkoutBorrowing()">
+                                    <i class="fas fa-check"></i> Konfirmasi Peminjaman
+                                </button>
+                                <button class="btn btn-secondary btn-block" onclick="clearCart()">
+                                    <i class="fas fa-trash"></i> Kosongkan Keranjang
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- My Borrowings Section -->
+            <section id="myBorrowingsSection" class="user-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-history"></i> Riwayat Peminjaman</h2>
+                </div>
+
+                <div class="filters-bar">
+                    <select id="myBorrowingStatusFilter" onchange="loadMyBorrowings()">
+                        <option value="">Semua Status</option>
+                        <option value="active">Aktif</option>
+                        <option value="returned">Dikembalikan</option>
+                        <option value="cancelled">Dibatalkan</option>
+                    </select>
+                </div>
+
+                <div id="myBorrowingsList" class="borrowings-list">
+                    <!-- User borrowings will be loaded here -->
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Add/Edit Tool Modal -->
+    <div id="toolModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="toolModalTitle">Tambah Alat Baru</h3>
+                <button class="close-btn" onclick="closeToolModal()">&times;</button>
+            </div>
+            <form id="toolForm" enctype="multipart/form-data">
+                <input type="hidden" id="toolId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="toolCode">Kode Alat *</label>
+                        <input type="text" id="toolCode" name="tool_code" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolName">Nama Alat *</label>
+                        <input type="text" id="toolName" name="name" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="toolCategory">Kategori *</label>
+                        <input type="text" id="toolCategory" name="category" list="categoryList" required>
+                        <datalist id="categoryList"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolQuantity">Jumlah *</label>
+                        <input type="number" id="toolQuantity" name="quantity" min="1" value="1" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="toolCondition">Kondisi *</label>
+                        <select id="toolCondition" name="condition" required>
+                            <option value="baik">Baik</option>
+                            <option value="rusak ringan">Rusak Ringan</option>
+                            <option value="rusak berat">Rusak Berat</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="toolLocation">Lokasi</label>
+                        <input type="text" id="toolLocation" name="location">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="toolDescription">Deskripsi</label>
+                    <textarea id="toolDescription" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="toolImage">Foto Alat</label>
+                    <input type="file" id="toolImage" name="image" accept="image/*">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeToolModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tool Detail Modal -->
+    <div id="toolDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Detail Alat</h3>
+                <button class="close-btn" onclick="closeToolDetailModal()">&times;</button>
+            </div>
+            <div id="toolDetailContent" class="tool-detail-content">
+                <!-- Tool details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Borrowing Detail Modal -->
+    <div id="borrowingDetailModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>Detail Peminjaman</h3>
+                <button class="close-btn" onclick="closeBorrowingDetailModal()">&times;</button>
+            </div>
+            <div id="borrowingDetailContent" class="borrowing-detail-content">
+                <!-- Borrowing details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Return Tool Modal -->
+    <div id="returnModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Pengembalian Alat</h3>
+                <button class="close-btn" onclick="closeReturnModal()">&times;</button>
+            </div>
+            <form id="returnForm">
+                <input type="hidden" id="returnBorrowingId">
+                <div id="returnItemsList" class="return-items-list">
+                    <!-- Return items will be loaded here -->
+                </div>
+                <div class="form-group">
+                    <label for="returnNotes">Catatan Pengembalian</label>
+                    <textarea id="returnNotes" rows="3" placeholder="Tambahkan catatan jika ada..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="returnPhoto">Foto Alat yang Dikembalikan</label>
+                    <input type="file" id="returnPhoto" accept="image/*" capture="environment">
+                    <small>Ambil foto semua alat yang dikembalikan</small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeReturnModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary">Konfirmasi Pengembalian</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/user.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
