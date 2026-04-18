@@ -88,7 +88,7 @@ Sebelum memulai, pastikan komputer Anda memiliki:
    ```
 3. Clone repository:
    ```cmd
-   git clone https://github.com/yourusername/manajemen-alat-kantor.git
+   git clone https://github.com/rumiasiska75/manajemen-alat-kantor.git
    cd manajemen-alat-kantor
    ```
 

@@ -89,7 +89,7 @@ Sebelum memulai, pastikan Anda telah menginstall:
 
 ```bash
 # Clone dengan Git
-git clone https://github.com/yourusername/manajemen-alat-kantor.git
+git clone https://github.com/rumiasiska75/manajemen-alat-kantor.git
 cd manajemen-alat-kantor
 
 # Atau download ZIP dan extract
@@ -527,7 +527,7 @@ Project ini dilisensikan di bawah MIT License - lihat file [LICENSE](LICENSE) un
 Jika Anda mengalami masalah atau memiliki pertanyaan:
 
 1. Cek [Troubleshooting](#-troubleshooting) section
-2. Buka [Issue](https://github.com/yourusername/manajemen-alat-kantor/issues)
+2. Buka [Issue](https://github.com/rumiasiska75/manajemen-alat-kantor/issues)
 3. Email: support@example.com
 
 ---
