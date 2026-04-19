@@ -517,6 +517,12 @@ body {
     color: var(--text-secondary);
 }
 
+.section-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 /* ==================== STATS GRID ==================== */
 .stats-grid {
     display: grid;
@@ -592,6 +598,40 @@ body {
     border-color: var(--text-primary);
 }
 
+.batch-toolbar {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.batch-toolbar-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.batch-toolbar-info strong {
+    color: var(--text-primary);
+}
+
+.batch-toolbar-info span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.batch-toolbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 /* ==================== TOOLS GRID ==================== */
 .tools-grid {
     display: grid;
@@ -613,6 +653,11 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
+.tool-card.selected {
+    border-color: var(--info-color);
+    box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.15);
+}
+
 .tool-card-image {
     width: 100%;
     height: 200px;
@@ -623,6 +668,21 @@ body {
 
 .tool-card-body {
     padding: 20px;
+}
+
+.tool-card-select {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 22px;
+    height: 22px;
+    accent-color: var(--info-color);
+    cursor: pointer;
+    z-index: 2;
+}
+
+.tool-card {
+    position: relative;
 }
 
 .tool-card-header {
@@ -923,6 +983,63 @@ body {
     justify-content: flex-end;
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
+}
+
+.batch-modal-description {
+    margin-bottom: 18px;
+    color: var(--text-secondary);
+}
+
+.batch-row-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.batch-table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 20px;
+}
+
+.batch-tool-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 980px;
+}
+
+.batch-tool-table th,
+.batch-tool-table td {
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    vertical-align: top;
+}
+
+.batch-tool-table th {
+    background: var(--bg-secondary);
+    text-align: left;
+    font-size: 13px;
+}
+
+.batch-tool-table input,
+.batch-tool-table select,
+.batch-tool-table textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.batch-tool-table textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.batch-remove-row {
+    width: 100%;
 }
 
 /* ==================== TOOL DETAIL ==================== */
@@ -1343,6 +1460,15 @@ body {
 
     .filters-bar {
         flex-direction: column;
+    }
+
+    .section-actions,
+    .batch-toolbar-actions {
+        width: 100%;
+    }
+
+    .batch-toolbar {
+        align-items: stretch;
     }
 
     .filters-bar input,

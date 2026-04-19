@@ -293,12 +293,20 @@
                 <section id="toolsSection" class="admin-section">
                     <div class="section-header">
                         <h2><i class="fas fa-toolbox"></i> Manajemen Alat</h2>
-                        <button
-                            class="btn btn-primary"
-                            onclick="showAddToolModal()"
-                        >
-                            <i class="fas fa-plus"></i> Tambah Alat
-                        </button>
+                        <div class="section-actions">
+                            <button
+                                class="btn btn-secondary"
+                                onclick="showBatchAddToolModal()"
+                            >
+                                <i class="fas fa-layer-group"></i> Batch Add
+                            </button>
+                            <button
+                                class="btn btn-primary"
+                                onclick="showAddToolModal()"
+                            >
+                                <i class="fas fa-plus"></i> Tambah Alat
+                            </button>
+                        </div>
                     </div>
 
                     <div class="filters-bar">
@@ -317,6 +325,40 @@
                             <option value="rusak ringan">Rusak Ringan</option>
                             <option value="rusak berat">Rusak Berat</option>
                         </select>
+                    </div>
+
+                    <div class="batch-toolbar">
+                        <div class="batch-toolbar-info">
+                            <strong id="selectedToolsCount">0 alat dipilih</strong>
+                            <span>Pilih beberapa kartu untuk hapus massal atau print QR sekaligus.</span>
+                        </div>
+                        <div class="batch-toolbar-actions">
+                            <button
+                                class="btn btn-secondary btn-sm"
+                                onclick="toggleSelectAllVisibleTools()"
+                                id="toggleSelectToolsButton"
+                            >
+                                <i class="fas fa-check-square"></i> Pilih Semua
+                            </button>
+                            <button
+                                class="btn btn-secondary btn-sm"
+                                onclick="clearToolSelection()"
+                            >
+                                <i class="fas fa-eraser"></i> Bersihkan Pilihan
+                            </button>
+                            <button
+                                class="btn btn-primary btn-sm"
+                                onclick="printSelectedToolQRCodes()"
+                            >
+                                <i class="fas fa-print"></i> Batch Print QR
+                            </button>
+                            <button
+                                class="btn btn-danger btn-sm"
+                                onclick="deleteSelectedTools()"
+                            >
+                                <i class="fas fa-trash"></i> Batch Remove
+                            </button>
+                        </div>
                     </div>
 
                     <div id="toolsList" class="tools-grid">
@@ -729,6 +771,65 @@
                         </button>
                         <button type="submit" class="btn btn-primary">
                             Simpan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Batch Add Tool Modal -->
+        <div id="batchToolModal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3>Batch Add Alat</h3>
+                    <button
+                        class="close-btn"
+                        onclick="closeBatchAddToolModal()"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <form id="batchToolForm">
+                    <p class="batch-modal-description">
+                        Tambahkan banyak alat sekaligus. Setiap baris akan
+                        otomatis dibuatkan QR code.
+                    </p>
+                    <div class="batch-row-actions">
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            onclick="addBatchToolRow()"
+                        >
+                            <i class="fas fa-plus"></i> Tambah Baris
+                        </button>
+                    </div>
+                    <div class="batch-table-wrapper">
+                        <table class="batch-tool-table">
+                            <thead>
+                                <tr>
+                                    <th>Kode Alat</th>
+                                    <th>Nama Alat</th>
+                                    <th>Kategori</th>
+                                    <th>Jumlah</th>
+                                    <th>Kondisi</th>
+                                    <th>Lokasi</th>
+                                    <th>Deskripsi</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batchToolRows"></tbody>
+                        </table>
+                    </div>
+                    <div class="modal-actions">
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            onclick="closeBatchAddToolModal()"
+                        >
+                            Batal
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            Simpan Batch
                         </button>
                     </div>
                 </form>

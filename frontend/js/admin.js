@@ -53,6 +53,7 @@ function formatDateShortWIB(dateString) {
 let allTools = [];
 let allBorrowings = [];
 let currentEditingTool = null;
+let selectedToolIds = new Set();
 
 /**
  * Load admin dashboard
@@ -198,7 +199,13 @@ async function loadTools(filters = {}) {
 
     if (response.success) {
       allTools = response.data;
+      selectedToolIds = new Set(
+        [...selectedToolIds].filter((toolId) =>
+          allTools.some((tool) => tool.id === toolId),
+        ),
+      );
       displayTools(allTools);
+      updateSelectedToolsUI();
     }
   } catch (error) {
     console.error("Error loading tools:", error);
@@ -223,13 +230,21 @@ function displayTools(tools) {
                 <small>Klik tombol "Tambah Alat" untuk menambahkan alat baru</small>
             </div>
         `;
+    updateSelectedToolsUI();
     return;
   }
 
   container.innerHTML = tools
     .map(
       (tool) => `
-        <div class="tool-card" onclick="showToolDetail(${tool.id})">
+        <div class="tool-card ${selectedToolIds.has(tool.id) ? "selected" : ""}" onclick="showToolDetail(${tool.id})">
+            <input
+                type="checkbox"
+                class="tool-card-select"
+                ${selectedToolIds.has(tool.id) ? "checked" : ""}
+                onclick="toggleToolSelection(${tool.id}, event)"
+                aria-label="Pilih ${tool.name}"
+            >
             <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-card-image" onerror="this.src='/images/placeholder.png'">
             <div class="tool-card-body">
                 <div class="tool-card-header">
@@ -257,6 +272,68 @@ function displayTools(tools) {
     `,
     )
     .join("");
+}
+
+function updateSelectedToolsUI() {
+  const selectedCountElement = document.getElementById("selectedToolsCount");
+  const toggleButton = document.getElementById("toggleSelectToolsButton");
+
+  if (selectedCountElement) {
+    selectedCountElement.textContent = `${selectedToolIds.size} alat dipilih`;
+  }
+
+  if (toggleButton) {
+    const allVisibleSelected =
+      allTools.length > 0 && allTools.every((tool) => selectedToolIds.has(tool.id));
+    toggleButton.innerHTML = allVisibleSelected
+      ? '<i class="fas fa-square"></i> Batal Pilih Semua'
+      : '<i class="fas fa-check-square"></i> Pilih Semua';
+  }
+}
+
+function toggleToolSelection(toolId, event) {
+  event.stopPropagation();
+
+  if (selectedToolIds.has(toolId)) {
+    selectedToolIds.delete(toolId);
+  } else {
+    selectedToolIds.add(toolId);
+  }
+
+  displayTools(allTools);
+  updateSelectedToolsUI();
+}
+
+function toggleSelectAllVisibleTools() {
+  if (allTools.length === 0) {
+    showToast("Tidak ada alat pada daftar saat ini", "warning");
+    return;
+  }
+
+  const allVisibleSelected = allTools.every((tool) =>
+    selectedToolIds.has(tool.id),
+  );
+
+  allTools.forEach((tool) => {
+    if (allVisibleSelected) {
+      selectedToolIds.delete(tool.id);
+    } else {
+      selectedToolIds.add(tool.id);
+    }
+  });
+
+  displayTools(allTools);
+  updateSelectedToolsUI();
+}
+
+function clearToolSelection() {
+  selectedToolIds.clear();
+  displayTools(allTools);
+  updateSelectedToolsUI();
+}
+
+function getSelectedTools() {
+  return allTools.filter((tool) => selectedToolIds.has(tool.id));
 }
 
 /**
@@ -321,6 +398,65 @@ function closeToolModal() {
   document.getElementById("toolModal").classList.remove("active");
   document.getElementById("toolForm").reset();
   currentEditingTool = null;
+}
+
+function showBatchAddToolModal() {
+  const rowsContainer = document.getElementById("batchToolRows");
+  if (!rowsContainer) return;
+
+  rowsContainer.innerHTML = "";
+  addBatchToolRow();
+  addBatchToolRow();
+  addBatchToolRow();
+
+  document.getElementById("batchToolModal").classList.add("active");
+}
+
+function closeBatchAddToolModal() {
+  document.getElementById("batchToolModal").classList.remove("active");
+  document.getElementById("batchToolForm").reset();
+  document.getElementById("batchToolRows").innerHTML = "";
+}
+
+function addBatchToolRow(defaultValues = {}) {
+  const rowsContainer = document.getElementById("batchToolRows");
+  if (!rowsContainer) return;
+
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td><input type="text" data-field="tool_code" value="${defaultValues.tool_code || ""}" required></td>
+    <td><input type="text" data-field="name" value="${defaultValues.name || ""}" required></td>
+    <td><input type="text" data-field="category" value="${defaultValues.category || ""}" list="categoryList" required></td>
+    <td><input type="number" data-field="quantity" value="${defaultValues.quantity || 1}" min="1" required></td>
+    <td>
+      <select data-field="condition">
+        <option value="baik" ${defaultValues.condition === "rusak ringan" || defaultValues.condition === "rusak berat" ? "" : "selected"}>Baik</option>
+        <option value="rusak ringan" ${defaultValues.condition === "rusak ringan" ? "selected" : ""}>Rusak Ringan</option>
+        <option value="rusak berat" ${defaultValues.condition === "rusak berat" ? "selected" : ""}>Rusak Berat</option>
+      </select>
+    </td>
+    <td><input type="text" data-field="location" value="${defaultValues.location || ""}"></td>
+    <td><textarea data-field="description" rows="2">${defaultValues.description || ""}</textarea></td>
+    <td>
+      <button type="button" class="btn btn-danger btn-sm batch-remove-row" onclick="removeBatchToolRow(this)">
+        <i class="fas fa-times"></i> Hapus
+      </button>
+    </td>
+  `;
+
+  rowsContainer.appendChild(row);
+}
+
+function removeBatchToolRow(button) {
+  const rowsContainer = document.getElementById("batchToolRows");
+  if (!rowsContainer) return;
+
+  if (rowsContainer.children.length === 1) {
+    showToast("Minimal harus ada satu baris pada batch add", "warning");
+    return;
+  }
+
+  button.closest("tr").remove();
 }
 
 /**
@@ -405,6 +541,51 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  const batchToolForm = document.getElementById("batchToolForm");
+  if (batchToolForm) {
+    batchToolForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const rows = document.querySelectorAll("#batchToolRows tr");
+      const tools = Array.from(rows)
+        .map((row) => ({
+          tool_code: row.querySelector('[data-field="tool_code"]').value.trim(),
+          name: row.querySelector('[data-field="name"]').value.trim(),
+          category: row.querySelector('[data-field="category"]').value.trim(),
+          quantity: row.querySelector('[data-field="quantity"]').value,
+          condition: row.querySelector('[data-field="condition"]').value,
+          location: row.querySelector('[data-field="location"]').value.trim(),
+          description: row.querySelector('[data-field="description"]').value.trim(),
+        }))
+        .filter((tool) => tool.tool_code || tool.name || tool.category);
+
+      if (tools.length === 0) {
+        showToast("Isi minimal satu baris batch add", "warning");
+        return;
+      }
+
+      try {
+        showLoading();
+
+        const response = await apiRequest(API_ENDPOINTS.TOOLS.BATCH_CREATE, {
+          method: "POST",
+          body: JSON.stringify({ tools }),
+        });
+
+        if (response.success) {
+          showToast(response.message || "Batch add berhasil", "success");
+          closeBatchAddToolModal();
+          await loadTools();
+        }
+      } catch (error) {
+        console.error("Error saving batch tools:", error);
+        showToast(error.message || "Gagal menyimpan batch alat", "error");
+      } finally {
+        hideLoading();
+      }
+    });
+  }
 });
 
 /**
@@ -432,6 +613,153 @@ async function deleteTool(toolId) {
   } finally {
     hideLoading();
   }
+}
+
+async function deleteSelectedTools() {
+  const selectedTools = getSelectedTools();
+
+  if (selectedTools.length === 0) {
+    showToast("Pilih alat yang ingin dihapus", "warning");
+    return;
+  }
+
+  if (
+    !confirmAction(
+      `Hapus ${selectedTools.length} alat yang dipilih? Alat yang sedang dipinjam tidak akan bisa dihapus.`,
+    )
+  ) {
+    return;
+  }
+
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.TOOLS.BATCH_DELETE, {
+      method: "POST",
+      body: JSON.stringify({
+        ids: selectedTools.map((tool) => tool.id),
+      }),
+    });
+
+    if (response.success) {
+      showToast(response.message || "Batch remove berhasil", "success");
+      clearToolSelection();
+      await loadTools();
+    }
+  } catch (error) {
+    console.error("Error deleting selected tools:", error);
+    showToast(error.message || "Gagal menghapus alat terpilih", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+function printSelectedToolQRCodes() {
+  const selectedTools = getSelectedTools();
+
+  if (selectedTools.length === 0) {
+    showToast("Pilih alat yang ingin dicetak QR code-nya", "warning");
+    return;
+  }
+
+  const printableTools = selectedTools.filter((tool) => tool.qr_code_path);
+
+  if (printableTools.length === 0) {
+    showToast("Tidak ada QR code yang siap dicetak", "error");
+    return;
+  }
+
+  if (printableTools.length !== selectedTools.length) {
+    showToast(
+      "Sebagian alat belum memiliki QR code dan dilewati saat print",
+      "warning",
+    );
+  }
+
+  const printWindow = window.open("", "_blank");
+  const cardsHtml = printableTools
+    .map(
+      (tool) => `
+        <article class="print-card">
+          <img src="${getImageUrl(tool.qr_code_path)}" alt="QR ${tool.tool_code}">
+          <h3>${tool.name}</h3>
+          <p>${tool.tool_code}</p>
+        </article>
+      `,
+    )
+    .join("");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="id">
+      <head>
+        <meta charset="UTF-8">
+        <title>Batch Print QR Code</title>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            color: #111827;
+          }
+          .print-header {
+            margin-bottom: 20px;
+          }
+          .print-header h1 {
+            margin: 0 0 6px;
+            font-size: 22px;
+          }
+          .print-header p {
+            margin: 0;
+            color: #4b5563;
+          }
+          .print-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 18px;
+          }
+          .print-card {
+            border: 1px solid #d1d5db;
+            border-radius: 16px;
+            padding: 18px;
+            text-align: center;
+            break-inside: avoid;
+          }
+          .print-card img {
+            width: 170px;
+            height: 170px;
+            object-fit: contain;
+            margin-bottom: 14px;
+          }
+          .print-card h3 {
+            margin: 0 0 6px;
+            font-size: 18px;
+          }
+          .print-card p {
+            margin: 0;
+            font-size: 14px;
+            letter-spacing: 0.08em;
+          }
+          @media print {
+            body { padding: 12px; }
+          }
+        </style>
+      </head>
+      <body>
+        <header class="print-header">
+          <h1>Batch Print QR Code Alat</h1>
+          <p>${printableTools.length} alat siap dicetak</p>
+        </header>
+        <section class="print-grid">${cardsHtml}</section>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+  }, 400);
 }
 
 /**

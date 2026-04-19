@@ -8,13 +8,107 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
+function ensureDirectoryExists(directoryPath) {
+  if (!fs.existsSync(directoryPath)) {
+    fs.mkdirSync(directoryPath, { recursive: true });
+  }
+}
+
+function deleteFileIfExists(filePath) {
+  if (!filePath) return;
+
+  const resolvedPath = path.join(__dirname, '..', filePath);
+  if (!fs.existsSync(resolvedPath)) return;
+
+  try {
+    fs.unlinkSync(resolvedPath);
+  } catch (error) {
+    console.error(`Failed to delete file: ${resolvedPath}`, error);
+  }
+}
+
+function normalizeText(value) {
+  if (value === undefined || value === null) return null;
+
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function normalizeQuantity(value, defaultValue = 1) {
+  const parsedValue = parseInt(value, 10);
+  return Number.isInteger(parsedValue) && parsedValue > 0 ? parsedValue : defaultValue;
+}
+
+async function createToolRecord(toolData, userId) {
+  const toolCode = normalizeText(toolData.tool_code);
+  const name = normalizeText(toolData.name);
+  const category = normalizeText(toolData.category);
+  const description = normalizeText(toolData.description);
+  const condition = normalizeText(toolData.condition) || 'baik';
+  const location = normalizeText(toolData.location);
+  const quantity = normalizeQuantity(toolData.quantity);
+  const imagePath = toolData.imagePath || null;
+
+  if (!toolCode || !name || !category) {
+    const error = new Error('Kode alat, nama, dan kategori wajib diisi.');
+    error.status = 400;
+    throw error;
+  }
+
+  const existingTool = await database.get(
+    'SELECT id FROM tools WHERE tool_code = ?',
+    [toolCode]
+  );
+
+  if (existingTool) {
+    const error = new Error(`Kode alat sudah digunakan: ${toolCode}`);
+    error.status = 409;
+    throw error;
+  }
+
+  const insertResult = await database.run(
+    `INSERT INTO tools (tool_code, name, category, description, quantity, available_quantity,
+                        condition, location, image_path, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      toolCode,
+      name,
+      category,
+      description,
+      quantity,
+      quantity,
+      condition,
+      location,
+      imagePath,
+      userId
+    ]
+  );
+
+  const toolId = insertResult.id;
+  let qrCodePath = null;
+
+  try {
+    qrCodePath = await generateQRCode(toolCode, toolId);
+    await database.run(
+      'UPDATE tools SET qr_code_path = ? WHERE id = ?',
+      [qrCodePath, toolId]
+    );
+  } catch (qrError) {
+    console.error('QR generation error:', qrError);
+  }
+
+  const tool = await database.get('SELECT * FROM tools WHERE id = ?', [toolId]);
+  return {
+    tool,
+    qrCodePath
+  };
+}
+
 // Configure multer for image uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = './uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    ensureDirectoryExists(uploadDir);
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
@@ -43,9 +137,7 @@ const upload = multer({
 async function generateQRCode(toolCode, toolId) {
   try {
     const qrDir = './qrcodes';
-    if (!fs.existsSync(qrDir)) {
-      fs.mkdirSync(qrDir, { recursive: true });
-    }
+    ensureDirectoryExists(qrDir);
 
     const qrData = JSON.stringify({
       tool_id: toolId,
@@ -120,6 +212,204 @@ router.get('/', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Terjadi kesalahan saat mengambil data alat.',
+      error: error.message
+    });
+  }
+});
+
+// @route   POST /api/tools/batch
+// @desc    Create multiple tools at once (Admin only)
+// @access  Private (Admin)
+router.post('/batch', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const tools = Array.isArray(req.body.tools) ? req.body.tools : [];
+
+    if (tools.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Minimal satu alat harus dikirim untuk batch add.'
+      });
+    }
+
+    const normalizedTools = tools.map((tool) => ({
+      tool_code: normalizeText(tool.tool_code),
+      name: normalizeText(tool.name),
+      category: normalizeText(tool.category),
+      description: normalizeText(tool.description),
+      quantity: normalizeQuantity(tool.quantity),
+      condition: normalizeText(tool.condition) || 'baik',
+      location: normalizeText(tool.location)
+    }));
+
+    const missingRequired = normalizedTools.find(
+      (tool) => !tool.tool_code || !tool.name || !tool.category
+    );
+
+    if (missingRequired) {
+      return res.status(400).json({
+        success: false,
+        message: 'Setiap baris batch add wajib memiliki kode alat, nama, dan kategori.'
+      });
+    }
+
+    const duplicateCodes = normalizedTools
+      .map((tool) => tool.tool_code)
+      .filter((toolCode, index, array) => array.indexOf(toolCode) !== index);
+
+    if (duplicateCodes.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Kode alat duplikat dalam batch: ${[...new Set(duplicateCodes)].join(', ')}`
+      });
+    }
+
+    const placeholders = normalizedTools.map(() => '?').join(', ');
+    const existingTools = await database.query(
+      `SELECT tool_code FROM tools WHERE tool_code IN (${placeholders})`,
+      normalizedTools.map((tool) => tool.tool_code)
+    );
+
+    if (existingTools.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Kode alat sudah digunakan: ${existingTools.map((tool) => tool.tool_code).join(', ')}`
+      });
+    }
+
+    const createdTools = [];
+    const createdQrFiles = [];
+
+    await database.run('BEGIN TRANSACTION');
+
+    try {
+      for (const toolData of normalizedTools) {
+        const { tool, qrCodePath } = await createToolRecord(toolData, req.user.id);
+        createdTools.push(tool);
+
+        if (qrCodePath) {
+          createdQrFiles.push(qrCodePath);
+        }
+      }
+
+      await database.run(
+        `INSERT INTO activity_logs (user_id, action, entity_type, description)
+         VALUES (?, ?, ?, ?)`,
+        [
+          req.user.id,
+          'BATCH_CREATE',
+          'tool',
+          `Batch created ${createdTools.length} tools`
+        ]
+      );
+
+      await database.run('COMMIT');
+    } catch (error) {
+      await database.run('ROLLBACK');
+      createdQrFiles.forEach((filePath) => deleteFileIfExists(filePath));
+      throw error;
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `${createdTools.length} alat berhasil ditambahkan.`,
+      data: createdTools,
+      count: createdTools.length
+    });
+  } catch (error) {
+    console.error('Error creating tools in batch:', error);
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Terjadi kesalahan saat batch add alat.',
+      error: error.message
+    });
+  }
+});
+
+// @route   POST /api/tools/batch-delete
+// @desc    Delete multiple tools at once (Admin only)
+// @access  Private (Admin)
+router.post('/batch-delete', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids)
+      ? [...new Set(req.body.ids.map((id) => parseInt(id, 10)).filter(Number.isInteger))]
+      : [];
+
+    if (ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Pilih minimal satu alat untuk dihapus.'
+      });
+    }
+
+    const placeholders = ids.map(() => '?').join(', ');
+    const tools = await database.query(
+      `SELECT * FROM tools WHERE id IN (${placeholders})`,
+      ids
+    );
+
+    if (tools.length !== ids.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sebagian alat tidak ditemukan. Muat ulang data lalu coba lagi.'
+      });
+    }
+
+    const activeBorrowings = await database.query(
+      `SELECT DISTINCT t.tool_code
+       FROM tools t
+       JOIN borrowing_items bi ON bi.tool_id = t.id
+       JOIN borrowings b ON bi.borrowing_id = b.id
+       WHERE t.id IN (${placeholders}) AND b.status IN ('active', 'approved')`,
+      ids
+    );
+
+    if (activeBorrowings.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Tidak dapat menghapus alat yang sedang dipinjam: ${activeBorrowings.map((tool) => tool.tool_code).join(', ')}`
+      });
+    }
+
+    await database.run('BEGIN TRANSACTION');
+
+    try {
+      await database.run(
+        `DELETE FROM tools WHERE id IN (${placeholders})`,
+        ids
+      );
+
+      await database.run(
+        `INSERT INTO activity_logs (user_id, action, entity_type, description)
+         VALUES (?, ?, ?, ?)`,
+        [
+          req.user.id,
+          'BATCH_DELETE',
+          'tool',
+          `Batch deleted ${tools.length} tools`
+        ]
+      );
+
+      await database.run('COMMIT');
+    } catch (error) {
+      await database.run('ROLLBACK');
+      throw error;
+    }
+
+    tools.forEach((tool) => {
+      deleteFileIfExists(tool.image_path);
+      deleteFileIfExists(tool.qr_code_path);
+    });
+
+    res.json({
+      success: true,
+      message: `${tools.length} alat berhasil dihapus.`,
+      count: tools.length
+    });
+  } catch (error) {
+    console.error('Error deleting tools in batch:', error);
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Terjadi kesalahan saat batch delete alat.',
       error: error.message
     });
   }
@@ -227,85 +517,41 @@ router.post('/', authenticateToken, isAdmin, upload.single('image'), async (req,
       });
     }
 
-    // Check if tool code already exists
-    const existingTool = await database.get(
-      'SELECT id FROM tools WHERE tool_code = ?',
-      [tool_code]
-    );
-
-    if (existingTool) {
-      return res.status(409).json({
-        success: false,
-        message: 'Kode alat sudah digunakan.'
-      });
-    }
-
-    const toolQuantity = parseInt(quantity) || 1;
     const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
-
-    // Insert tool first to get ID
-    const result = await database.run(
-      `INSERT INTO tools (tool_code, name, category, description, quantity, available_quantity,
-                          condition, location, image_path, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+    const { tool: newTool } = await createToolRecord(
+      {
         tool_code,
         name,
         category,
-        description || null,
-        toolQuantity,
-        toolQuantity,
-        condition || 'baik',
-        location || null,
-        imagePath,
-        req.user.id
-      ]
+        description,
+        quantity,
+        condition,
+        location,
+        imagePath
+      },
+      req.user.id
     );
 
-    const toolId = result.id;
+    // Log activity
+    await database.run(
+      `INSERT INTO activity_logs (user_id, action, entity_type, entity_id, description)
+       VALUES (?, ?, ?, ?, ?)`,
+      [req.user.id, 'CREATE', 'tool', newTool.id, `Created tool: ${newTool.name} (${newTool.tool_code})`]
+    );
 
-    // Generate QR code
-    try {
-      const qrCodePath = await generateQRCode(tool_code, toolId);
-
-      // Update tool with QR code path
-      await database.run(
-        'UPDATE tools SET qr_code_path = ? WHERE id = ?',
-        [qrCodePath, toolId]
-      );
-
-      // Get the created tool
-      const newTool = await database.get('SELECT * FROM tools WHERE id = ?', [toolId]);
-
-      // Log activity
-      await database.run(
-        `INSERT INTO activity_logs (user_id, action, entity_type, entity_id, description)
-         VALUES (?, ?, ?, ?, ?)`,
-        [req.user.id, 'CREATE', 'tool', toolId, `Created tool: ${name} (${tool_code})`]
-      );
-
-      res.status(201).json({
-        success: true,
-        message: 'Alat berhasil ditambahkan.',
-        data: newTool
-      });
-    } catch (qrError) {
-      console.error('QR generation error:', qrError);
-      // Still return success but note QR generation failed
-      const newTool = await database.get('SELECT * FROM tools WHERE id = ?', [toolId]);
-
-      res.status(201).json({
-        success: true,
-        message: 'Alat berhasil ditambahkan, namun QR code gagal dibuat.',
-        data: newTool,
-        warning: 'QR code generation failed'
-      });
-    }
+    res.status(201).json({
+      success: true,
+      message: newTool.qr_code_path
+        ? 'Alat berhasil ditambahkan.'
+        : 'Alat berhasil ditambahkan, namun QR code gagal dibuat.',
+      data: newTool,
+      warning: newTool.qr_code_path ? undefined : 'QR code generation failed'
+    });
   } catch (error) {
     console.error('Error creating tool:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      message: 'Terjadi kesalahan saat menambahkan alat.',
+      message: error.message || 'Terjadi kesalahan saat menambahkan alat.',
       error: error.message
     });
   }
@@ -385,12 +631,7 @@ router.put('/:id', authenticateToken, isAdmin, upload.single('image'), async (re
       updateParams.push(`/uploads/${req.file.filename}`);
 
       // Delete old image if exists
-      if (existingTool.image_path) {
-        const oldImagePath = path.join(__dirname, '..', existingTool.image_path);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
-      }
+      deleteFileIfExists(existingTool.image_path);
     }
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP');
@@ -406,12 +647,7 @@ router.put('/:id', authenticateToken, isAdmin, upload.single('image'), async (re
     if (tool_code && tool_code !== existingTool.tool_code) {
       try {
         // Delete old QR code
-        if (existingTool.qr_code_path) {
-          const oldQRPath = path.join(__dirname, '..', existingTool.qr_code_path);
-          if (fs.existsSync(oldQRPath)) {
-            fs.unlinkSync(oldQRPath);
-          }
-        }
+        deleteFileIfExists(existingTool.qr_code_path);
 
         // Generate new QR code
         const qrCodePath = await generateQRCode(tool_code, id);
@@ -479,19 +715,8 @@ router.delete('/:id', authenticateToken, isAdmin, async (req, res) => {
     }
 
     // Delete associated files
-    if (tool.image_path) {
-      const imagePath = path.join(__dirname, '..', tool.image_path);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
-
-    if (tool.qr_code_path) {
-      const qrPath = path.join(__dirname, '..', tool.qr_code_path);
-      if (fs.existsSync(qrPath)) {
-        fs.unlinkSync(qrPath);
-      }
-    }
+    deleteFileIfExists(tool.image_path);
+    deleteFileIfExists(tool.qr_code_path);
 
     // Delete tool
     await database.run('DELETE FROM tools WHERE id = ?', [id]);
@@ -557,12 +782,7 @@ router.post('/:id/regenerate-qr', authenticateToken, isAdmin, async (req, res) =
     }
 
     // Delete old QR code if exists
-    if (tool.qr_code_path) {
-      const oldQRPath = path.join(__dirname, '..', tool.qr_code_path);
-      if (fs.existsSync(oldQRPath)) {
-        fs.unlinkSync(oldQRPath);
-      }
-    }
+    deleteFileIfExists(tool.qr_code_path);
 
     // Generate new QR code
     const qrCodePath = await generateQRCode(tool.tool_code, id);
