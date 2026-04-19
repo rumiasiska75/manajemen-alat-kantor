@@ -7,7 +7,19 @@ function formatDateWIB(dateString) {
   if (!dateString) return "-";
 
   try {
-    const date = new Date(dateString);
+    const date = parseAppDate(dateString);
+    if (!date || Number.isNaN(date.getTime())) return dateString;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateString).trim())) {
+      return (
+        date.toLocaleDateString("id-ID", {
+          timeZone: "Asia/Jakarta",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }) + " WIB"
+      );
+    }
 
     // Format: DD/MM/YYYY HH:mm:ss WIB
     return (
@@ -35,7 +47,8 @@ function formatDateShortWIB(dateString) {
   if (!dateString) return "-";
 
   try {
-    const date = new Date(dateString);
+    const date = parseAppDate(dateString);
+    if (!date || Number.isNaN(date.getTime())) return dateString;
 
     // Format: DD/MM/YYYY
     return date.toLocaleString("id-ID", {
@@ -435,7 +448,7 @@ function displayCart() {
     .map(
       (item, index) => `
         <div class="cart-item">
-            <img src="${getImageUrl(item.image_path)}" alt="${item.name}" class="cart-item-image" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
+            <img src="${getImageUrl(item.image_path)}" alt="${item.name}" class="cart-item-image" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
             <div class="cart-item-info">
                 <div class="cart-item-name">${item.name}</div>
                 <div class="cart-item-code">#${item.tool_code}</div>

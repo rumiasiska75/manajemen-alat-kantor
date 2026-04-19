@@ -7,7 +7,19 @@ function formatDateWIB(dateString) {
   if (!dateString) return "-";
 
   try {
-    const date = new Date(dateString);
+    const date = parseAppDate(dateString);
+    if (!date || Number.isNaN(date.getTime())) return dateString;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(dateString).trim())) {
+      return (
+        date.toLocaleDateString("id-ID", {
+          timeZone: "Asia/Jakarta",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }) + " WIB"
+      );
+    }
 
     // Format: DD/MM/YYYY HH:mm:ss WIB
     return (
@@ -35,7 +47,8 @@ function formatDateShortWIB(dateString) {
   if (!dateString) return "-";
 
   try {
-    const date = new Date(dateString);
+    const date = parseAppDate(dateString);
+    if (!date || Number.isNaN(date.getTime())) return dateString;
 
     // Format: DD/MM/YYYY
     return date.toLocaleString("id-ID", {
@@ -245,7 +258,7 @@ function displayTools(tools) {
                 onclick="toggleToolSelection(${tool.id}, event)"
                 aria-label="Pilih ${tool.name}"
             >
-            <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-card-image" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
+            <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-card-image" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
             <div class="tool-card-body">
                 <div class="tool-card-header">
                     <div>
@@ -863,7 +876,7 @@ async function showToolDetail(toolId) {
       const tool = response.data;
 
       const content = `
-                <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-detail-image" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
+                <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-detail-image" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
 
                 <div class="tool-detail-grid">
                     <div class="detail-item">
@@ -1134,7 +1147,7 @@ async function showBorrowingDetail(borrowingId) {
                         (item) => `
                         <div class="borrowing-item" style="padding: 12px; background: var(--light-color); border-radius: 8px; margin-bottom: 10px;">
                             <div style="display: flex; align-items: center; gap: 15px;">
-                                <img src="${getImageUrl(item.image_path)}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
+                                <img src="${getImageUrl(item.image_path)}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
                                 <div style="flex: 1;">
                                     <strong>${item.tool_name}</strong>
                                     <p style="font-size: 12px; color: var(--text-secondary);">

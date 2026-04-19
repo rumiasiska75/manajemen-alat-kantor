@@ -99,6 +99,24 @@ function initializeDateInputs() {
 function handleImageError(img) {
   img.onerror = null; // Prevent infinite loop
   img.src = DEFAULT_TOOL_PLACEHOLDER;
+  img.classList.add("is-placeholder");
+  img.dataset.placeholder = "true";
+}
+
+function markImageAsLoaded(img) {
+  if (!img) return;
+
+  if (
+    img.currentSrc === `${window.location.origin}${DEFAULT_TOOL_PLACEHOLDER}` ||
+    img.src.endsWith(DEFAULT_TOOL_PLACEHOLDER)
+  ) {
+    img.classList.add("is-placeholder");
+    img.dataset.placeholder = "true";
+    return;
+  }
+
+  img.classList.remove("is-placeholder");
+  delete img.dataset.placeholder;
 }
 
 /**

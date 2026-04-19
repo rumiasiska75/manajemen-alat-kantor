@@ -12,8 +12,9 @@ function getWIBDateTime() {
   return new Date()
     .toLocaleString("sv-SE", {
       timeZone: "Asia/Jakarta",
+      hour12: false,
     })
-    .replace(" ", "T");
+    .replace(" ", " ");
 }
 
 function formatDateWIB(date) {
@@ -304,14 +305,19 @@ router.post(
 
       // Create borrowing transaction
       const borrowingResult = await database.run(
-        `INSERT INTO borrowings (user_id, status, expected_return_date, notes, photo_evidence)
-       VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO borrowings (
+           user_id, status, borrow_date, expected_return_date, notes, photo_evidence, created_at, updated_at
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           req.user.id,
           "active",
+          getWIBDateTime(),
           expected_return_date || null,
           notes || null,
           photoPath,
+          getWIBDateTime(),
+          getWIBDateTime(),
         ],
       );
 
@@ -481,11 +487,12 @@ router.put(
       await database.run(
         `UPDATE borrowings
        SET status = 'returned',
-           actual_return_date = CURRENT_TIMESTAMP,
+           actual_return_date = ?,
            photo_evidence = ?,
-           notes = COALESCE(?, notes)
+           notes = COALESCE(?, notes),
+           updated_at = ?
        WHERE id = ?`,
-        [photoPath, notes, id],
+        [getWIBDateTime(), photoPath, notes, getWIBDateTime(), id],
       );
 
       // Log activity
@@ -560,9 +567,10 @@ router.put("/:id/approve", authenticateToken, isAdmin, async (req, res) => {
       `UPDATE borrowings
        SET status = 'approved',
            approved_by = ?,
-           approved_at = CURRENT_TIMESTAMP
+           approved_at = ?,
+           updated_at = ?
        WHERE id = ?`,
-      [req.user.id, id],
+      [req.user.id, getWIBDateTime(), getWIBDateTime(), id],
     );
 
     // Log activity
@@ -636,8 +644,8 @@ router.put("/:id/cancel", authenticateToken, async (req, res) => {
 
     // Update borrowing status
     await database.run(
-      "UPDATE borrowings SET status = 'cancelled' WHERE id = ?",
-      [id],
+      "UPDATE borrowings SET status = 'cancelled', updated_at = ? WHERE id = ?",
+      [getWIBDateTime(), id],
     );
 
     // Log activity

@@ -664,6 +664,7 @@ body {
     object-fit: cover;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
+    display: block;
 }
 
 .tool-card-body {
@@ -1193,6 +1194,15 @@ body {
     border-radius: 8px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
+    flex-shrink: 0;
+    display: block;
+}
+
+img.is-placeholder {
+    object-fit: contain !important;
+    object-position: center;
+    background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
+    padding: 10px;
 }
 
 .cart-item-info {
@@ -1469,6 +1479,10 @@ body {
         grid-template-columns: 1fr;
     }
 
+    .tool-card-image {
+        height: 180px;
+    }
+
     .form-row {
         grid-template-columns: 1fr;
     }
@@ -1561,6 +1575,19 @@ body {
         min-width: 250px;
         right: 10px;
         top: 10px;
+    }
+
+    .tool-card-image {
+        height: 160px;
+    }
+
+    .tool-detail-image {
+        max-height: 220px;
+    }
+
+    .cart-item-image {
+        width: 56px;
+        height: 56px;
     }
 }
 

@@ -48,6 +48,34 @@ const STORAGE_KEYS = {
 
 const DEFAULT_TOOL_PLACEHOLDER = "/images/Placeholder.png";
 
+function parseAppDate(dateInput) {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) return dateInput;
+
+  const value = String(dateInput).trim();
+  if (!value) return null;
+
+  // Date-only values from inputs are treated as WIB calendar dates.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00+07:00`);
+  }
+
+  // SQLite timestamps like "2026-04-19 12:34:56" are stored without offset.
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    return new Date(`${value.replace(" ", "T")}Z`);
+  }
+
+  // Treat ISO timestamps without explicit offset as UTC as well.
+  if (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value) &&
+    !/[zZ]|[+-]\d{2}:\d{2}$/.test(value)
+  ) {
+    return new Date(`${value}Z`);
+  }
+
+  return new Date(value);
+}
+
 // ==================== UTILITY FUNCTIONS ====================
 
 /**
@@ -190,7 +218,8 @@ function showToast(message, type = "info") {
  */
 function formatDate(dateString) {
   if (!dateString) return "-";
-  const date = new Date(dateString);
+  const date = parseAppDate(dateString);
+  if (!date || Number.isNaN(date.getTime())) return dateString;
   return (
     date.toLocaleString("id-ID", {
       timeZone: "Asia/Jakarta",
@@ -208,7 +237,8 @@ function formatDate(dateString) {
  */
 function formatDateSimple(dateString) {
   if (!dateString) return "-";
-  const date = new Date(dateString);
+  const date = parseAppDate(dateString);
+  if (!date || Number.isNaN(date.getTime())) return dateString;
   return date.toLocaleDateString("id-ID", {
     timeZone: "Asia/Jakarta",
   });
@@ -219,7 +249,8 @@ function formatDateSimple(dateString) {
  */
 function getRelativeTime(dateString) {
   if (!dateString) return "-";
-  const date = new Date(dateString);
+  const date = parseAppDate(dateString);
+  if (!date || Number.isNaN(date.getTime())) return dateString;
   const now = new Date();
   const diff = now - date;
   const seconds = Math.floor(diff / 1000);
