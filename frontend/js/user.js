@@ -435,7 +435,7 @@ function displayCart() {
     .map(
       (item, index) => `
         <div class="cart-item">
-            <img src="${getImageUrl(item.image_path)}" alt="${item.name}" class="cart-item-image" onerror="this.src='/images/placeholder.png'">
+            <img src="${getImageUrl(item.image_path)}" alt="${item.name}" class="cart-item-image" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
             <div class="cart-item-info">
                 <div class="cart-item-name">${item.name}</div>
                 <div class="cart-item-code">#${item.tool_code}</div>

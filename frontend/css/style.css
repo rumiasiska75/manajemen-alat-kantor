@@ -990,6 +990,25 @@ body {
     color: var(--text-secondary);
 }
 
+.batch-import-panel {
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-secondary);
+}
+
+.batch-import-panel .form-group {
+    flex: 1;
+    min-width: 260px;
+    margin-bottom: 0;
+}
+
 .batch-row-actions {
     display: flex;
     justify-content: flex-end;
@@ -1468,6 +1487,10 @@ body {
     }
 
     .batch-toolbar {
+        align-items: stretch;
+    }
+
+    .batch-import-panel {
         align-items: stretch;
     }
 

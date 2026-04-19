@@ -46,6 +46,8 @@ const STORAGE_KEYS = {
   CART: "borrow_cart",
 };
 
+const DEFAULT_TOOL_PLACEHOLDER = "/images/Placeholder.png";
+
 // ==================== UTILITY FUNCTIONS ====================
 
 /**
@@ -320,7 +322,7 @@ function confirmAction(message) {
  * Get base URL for images
  */
 function getImageUrl(path) {
-  if (!path) return "/images/placeholder.png";
+  if (!path) return DEFAULT_TOOL_PLACEHOLDER;
   if (path.startsWith("http")) return path;
   return window.location.origin + path;
 }

@@ -794,6 +794,30 @@
                         Tambahkan banyak alat sekaligus. Setiap baris akan
                         otomatis dibuatkan QR code.
                     </p>
+                    <div class="batch-import-panel">
+                        <div class="form-group">
+                            <label for="batchToolFile">
+                                Import dari Excel/CSV
+                            </label>
+                            <input
+                                type="file"
+                                id="batchToolFile"
+                                accept=".xlsx,.xls,.csv,.tsv"
+                            />
+                            <small>
+                                Header yang didukung:
+                                `tool_code`, `name`, `category`, `quantity`,
+                                `condition`, `location`, `description`
+                            </small>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            onclick="importBatchToolsFromFile()"
+                        >
+                            <i class="fas fa-file-import"></i> Import File
+                        </button>
+                    </div>
                     <div class="batch-row-actions">
                         <button
                             type="button"
@@ -1006,6 +1030,7 @@
 
         <!-- Scripts -->
         <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
         <script src="js/config.js"></script>
         <script src="js/auth.js"></script>
         <script src="js/admin.js"></script>

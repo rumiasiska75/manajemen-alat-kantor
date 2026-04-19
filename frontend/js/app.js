@@ -98,7 +98,7 @@ function initializeDateInputs() {
  */
 function handleImageError(img) {
   img.onerror = null; // Prevent infinite loop
-  img.src = "/images/placeholder.png";
+  img.src = DEFAULT_TOOL_PLACEHOLDER;
 }
 
 /**

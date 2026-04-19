@@ -245,7 +245,7 @@ function displayTools(tools) {
                 onclick="toggleToolSelection(${tool.id}, event)"
                 aria-label="Pilih ${tool.name}"
             >
-            <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-card-image" onerror="this.src='/images/placeholder.png'">
+            <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-card-image" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
             <div class="tool-card-body">
                 <div class="tool-card-header">
                     <div>
@@ -416,6 +416,92 @@ function closeBatchAddToolModal() {
   document.getElementById("batchToolModal").classList.remove("active");
   document.getElementById("batchToolForm").reset();
   document.getElementById("batchToolRows").innerHTML = "";
+}
+
+function normalizeImportedBatchRow(row = {}) {
+  return {
+    tool_code: String(
+      row.tool_code ?? row.kode_alat ?? row.kode ?? row.code ?? "",
+    ).trim(),
+    name: String(
+      row.name ?? row.nama_alat ?? row.nama ?? "",
+    ).trim(),
+    category: String(
+      row.category ?? row.kategori ?? "",
+    ).trim(),
+    quantity:
+      parseInt(row.quantity ?? row.jumlah ?? row.qty ?? 1, 10) > 0
+        ? parseInt(row.quantity ?? row.jumlah ?? row.qty ?? 1, 10)
+        : 1,
+    condition: String(
+      row.condition ?? row.kondisi ?? "baik",
+    ).trim().toLowerCase() || "baik",
+    location: String(
+      row.location ?? row.lokasi ?? "",
+    ).trim(),
+    description: String(
+      row.description ?? row.deskripsi ?? "",
+    ).trim(),
+  };
+}
+
+async function importBatchToolsFromFile() {
+  const fileInput = document.getElementById("batchToolFile");
+  const file = fileInput?.files?.[0];
+
+  if (!file) {
+    showToast("Pilih file Excel/CSV terlebih dahulu", "warning");
+    return;
+  }
+
+  if (typeof XLSX === "undefined") {
+    showToast("Library import spreadsheet belum siap", "error");
+    return;
+  }
+
+  try {
+    showLoading();
+
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheetName = workbook.SheetNames[0];
+
+    if (!sheetName) {
+      throw new Error("File tidak memiliki sheet/data yang bisa dibaca");
+    }
+
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet, {
+      defval: "",
+      raw: false,
+    });
+
+    if (rows.length === 0) {
+      throw new Error("File kosong atau header tidak terbaca");
+    }
+
+    const normalizedRows = rows
+      .map(normalizeImportedBatchRow)
+      .filter((row) => row.tool_code || row.name || row.category);
+
+    if (normalizedRows.length === 0) {
+      throw new Error("Tidak ada baris alat yang valid di file tersebut");
+    }
+
+    const rowsContainer = document.getElementById("batchToolRows");
+    rowsContainer.innerHTML = "";
+    normalizedRows.forEach((row) => addBatchToolRow(row));
+
+    showToast(
+      `${normalizedRows.length} baris alat berhasil dimuat dari file`,
+      "success",
+    );
+  } catch (error) {
+    console.error("Error importing batch tools:", error);
+    showToast(error.message || "Gagal membaca file Excel/CSV", "error");
+  } finally {
+    hideLoading();
+  }
 }
 
 function addBatchToolRow(defaultValues = {}) {
@@ -777,7 +863,7 @@ async function showToolDetail(toolId) {
       const tool = response.data;
 
       const content = `
-                ${tool.image_path ? `<img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-detail-image">` : ""}
+                <img src="${getImageUrl(tool.image_path)}" alt="${tool.name}" class="tool-detail-image" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
 
                 <div class="tool-detail-grid">
                     <div class="detail-item">
@@ -1048,7 +1134,7 @@ async function showBorrowingDetail(borrowingId) {
                         (item) => `
                         <div class="borrowing-item" style="padding: 12px; background: var(--light-color); border-radius: 8px; margin-bottom: 10px;">
                             <div style="display: flex; align-items: center; gap: 15px;">
-                                ${item.image_path ? `<img src="${getImageUrl(item.image_path)}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">` : ""}
+                                <img src="${getImageUrl(item.image_path)}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;" onerror="this.src=DEFAULT_TOOL_PLACEHOLDER">
                                 <div style="flex: 1;">
                                     <strong>${item.tool_name}</strong>
                                     <p style="font-size: 12px; color: var(--text-secondary);">
