@@ -44,7 +44,15 @@ const {
 
 function serveProtectedAsset(baseDir) {
   return (req, res) => {
-    const requestedPath = req.path.replace(/^\/+/, "");
+    const requestedPath = req.params[0];
+
+    if (!requestedPath) {
+      return res.status(404).json({
+        success: false,
+        message: "File tidak ditemukan.",
+      });
+    }
+
     const absolutePath = path.normalize(path.join(baseDir, requestedPath));
 
     if (!absolutePath.startsWith(path.normalize(baseDir))) {

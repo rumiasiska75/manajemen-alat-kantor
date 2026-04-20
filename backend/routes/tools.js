@@ -51,6 +51,29 @@ function formatDateTimeForExport(value) {
   return value;
 }
 
+async function getToolBorrowingLogs(toolId) {
+  return database.query(
+    `SELECT
+       bi.id,
+       b.id AS borrowing_id,
+       u.full_name,
+       u.username,
+       bi.quantity,
+       bi.condition_before,
+       bi.condition_after,
+       bi.notes,
+       b.borrow_date,
+       b.actual_return_date,
+       b.status
+     FROM borrowing_items bi
+     JOIN borrowings b ON b.id = bi.borrowing_id
+     JOIN users u ON u.id = b.user_id
+     WHERE bi.tool_id = ?
+     ORDER BY b.borrow_date DESC, bi.id DESC`,
+    [toolId],
+  );
+}
+
 function buildMetricsSelect() {
   return `
     SELECT
@@ -319,6 +342,41 @@ router.get("/categories/list", authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Terjadi kesalahan saat mengambil kategori.",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/:id/logs", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const tool = await database.get(
+      "SELECT id, serial_number, name FROM tools WHERE id = ?",
+      [id],
+    );
+
+    if (!tool) {
+      return res.status(404).json({
+        success: false,
+        message: "Peralatan tidak ditemukan.",
+      });
+    }
+
+    const logs = await getToolBorrowingLogs(id);
+
+    res.json({
+      success: true,
+      data: {
+        tool,
+        logs,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting tool logs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan saat mengambil log peralatan.",
       error: error.message,
     });
   }
@@ -717,22 +775,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
       });
     }
 
-    const borrowingHistory = await database.query(
-      `SELECT
-         b.*,
-         u.username,
-         u.full_name,
-         bi.quantity,
-         bi.condition_before,
-         bi.condition_after
-       FROM borrowing_items bi
-       JOIN borrowings b ON bi.borrowing_id = b.id
-       JOIN users u ON b.user_id = u.id
-       WHERE bi.tool_id = ?
-       ORDER BY b.borrow_date DESC
-       LIMIT 10`,
-      [id],
-    );
+    const borrowingHistory = await getToolBorrowingLogs(id);
 
     res.json({
       success: true,

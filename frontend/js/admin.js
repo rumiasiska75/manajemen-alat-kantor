@@ -79,6 +79,66 @@ function formatInventoryActivity(value) {
   return value ? formatDateWIB(value) : "-";
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderToolLogRows(logs = []) {
+  if (!logs.length) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <i class="fas fa-history"></i>
+        <p>Belum ada log peminjaman untuk peralatan ini.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="tool-log-table-wrapper">
+      <table class="tool-log-table">
+        <thead>
+          <tr>
+            <th>Peminjam</th>
+            <th>Dipinjam</th>
+            <th>Dikembalikan</th>
+            <th>Status</th>
+            <th>Kondisi</th>
+            <th>Catatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${logs
+            .map(
+              (log) => `
+                <tr>
+                  <td>${escapeHtml(log.full_name || log.username || "-")}</td>
+                  <td>${formatDateWIB(log.borrow_date)}</td>
+                  <td>${formatDateWIB(log.actual_return_date)}</td>
+                  <td>${getStatusBadge(log.status)}</td>
+                  <td>
+                    ${getConditionBadge(log.condition_before)}
+                    ${
+                      log.condition_after
+                        ? `<span class="tool-log-arrow">→</span> ${getConditionBadge(log.condition_after)}`
+                        : ""
+                    }
+                  </td>
+                  <td>${escapeHtml(log.notes || "-")}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function getAvailabilityBadge(status) {
   const normalizedStatus = status || "tersedia";
   const statusConfig = {
@@ -788,6 +848,59 @@ async function exportAllToolsToExcel() {
   }
 }
 
+async function exportToolLogsToExcel(toolId) {
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum siap", "error");
+    return;
+  }
+
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.TOOLS.LOGS(toolId), {
+      method: "GET",
+    });
+
+    if (!response.success) {
+      throw new Error("Gagal mengambil log peralatan");
+    }
+
+    const { tool, logs } = response.data;
+
+    if (!logs.length) {
+      showToast("Belum ada log untuk peralatan ini", "warning");
+      return;
+    }
+
+    const rows = logs.map((log) => ({
+      "Serial Number": tool.serial_number,
+      "Nama Barang": tool.name,
+      Peminjam: log.full_name || log.username || "-",
+      Dipinjam: log.borrow_date || "-",
+      Dikembalikan: log.actual_return_date || "-",
+      Status: log.status || "-",
+      "Kondisi Sebelum": log.condition_before || "-",
+      "Kondisi Sesudah": log.condition_after || "-",
+      Catatan: log.notes || "-",
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Log Peralatan");
+
+    XLSX.writeFile(
+      workbook,
+      `log-${tool.serial_number}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+    showToast("Export log peralatan berhasil", "success");
+  } catch (error) {
+    console.error("Error exporting tool logs:", error);
+    showToast(error.message || "Gagal export log peralatan", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
 /**
  * Delete tool
  */
@@ -1048,6 +1161,16 @@ async function showToolDetail(toolId) {
                 `
                     : ""
                 }
+
+                <div class="tool-log-section">
+                    <div class="tool-log-header">
+                        <label>Log Peminjaman Per Alat</label>
+                        <button class="btn btn-sm btn-outline" onclick="exportToolLogsToExcel(${tool.id})">
+                            <i class="fas fa-file-export"></i> Export Log
+                        </button>
+                    </div>
+                    ${renderToolLogRows(tool.borrowing_history || [])}
+                </div>
             `;
 
       document.getElementById("toolDetailContent").innerHTML = content;

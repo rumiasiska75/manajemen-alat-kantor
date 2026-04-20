@@ -1159,6 +1159,67 @@ body {
     background: white;
 }
 
+.tool-log-section {
+    margin-top: 20px;
+}
+
+.tool-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.tool-log-header label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.tool-log-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-primary);
+}
+
+.tool-log-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 780px;
+}
+
+.tool-log-table th,
+.tool-log-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+    font-size: 13px;
+}
+
+.tool-log-table th {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.tool-log-table tr:last-child td {
+    border-bottom: none;
+}
+
+.tool-log-arrow {
+    margin: 0 6px;
+    color: var(--text-secondary);
+}
+
+.compact-empty-state {
+    padding: 24px 16px;
+}
+
 /* ==================== QR SCANNER ==================== */
 .borrow-container {
     display: grid;

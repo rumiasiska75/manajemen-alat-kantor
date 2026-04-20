@@ -15,6 +15,7 @@ const API_ENDPOINTS = {
     BATCH_CREATE: `${API_BASE_URL}/tools/batch`,
     BATCH_DELETE: `${API_BASE_URL}/tools/batch-delete`,
     GET: (id) => `${API_BASE_URL}/tools/${id}`,
+    LOGS: (id) => `${API_BASE_URL}/tools/${id}/logs`,
     UPDATE: (id) => `${API_BASE_URL}/tools/${id}`,
     DELETE: (id) => `${API_BASE_URL}/tools/${id}`,
     BY_CODE: (code) => `${API_BASE_URL}/tools/code/${code}`,
