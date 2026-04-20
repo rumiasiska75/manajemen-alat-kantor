@@ -175,6 +175,36 @@ app.get(
   },
 );
 
+// Full activity logs endpoint (Admin only)
+app.get(
+  "/api/activity-logs",
+  authenticateToken,
+  isAdmin,
+  async (req, res) => {
+    try {
+      const logs = await database.query(
+        `SELECT al.*, u.username, u.full_name
+         FROM activity_logs al
+         JOIN users u ON al.user_id = u.id
+         ORDER BY al.created_at DESC, al.id DESC`,
+      );
+
+      res.json({
+        success: true,
+        data: logs,
+        count: logs.length,
+      });
+    } catch (error) {
+      console.error("Error getting activity logs:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan saat mengambil data aktivitas.",
+        error: error.message,
+      });
+    }
+  },
+);
+
 // User dashboard stats
 app.get(
   "/api/dashboard/user-stats",

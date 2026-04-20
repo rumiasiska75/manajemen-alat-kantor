@@ -40,6 +40,7 @@ const API_ENDPOINTS = {
     STATS: `${API_BASE_URL}/dashboard/stats`,
     USER_STATS: `${API_BASE_URL}/dashboard/user-stats`,
   },
+  ACTIVITY_LOGS: `${API_BASE_URL}/activity-logs`,
   // Users endpoints
   USERS: {
     LIST: `${API_BASE_URL}/users`,

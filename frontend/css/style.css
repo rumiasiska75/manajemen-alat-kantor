@@ -949,6 +949,10 @@ body {
     gap: 15px;
 }
 
+.activity-page-list {
+    margin-top: 8px;
+}
+
 .activity-item {
     padding: 15px;
     background: var(--bg-secondary);
@@ -1126,6 +1130,20 @@ body {
     justify-content: flex-end;
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
+}
+
+.activity-row {
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.activity-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 12px;
 }
 
 .batch-modal-description {
@@ -2089,6 +2107,11 @@ img.is-placeholder {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
+    }
+
+    .activity-item {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .borrow-container {

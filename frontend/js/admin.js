@@ -69,6 +69,10 @@ let currentEditingTool = null;
 let selectedToolIds = new Set();
 let knownCategories = [];
 let knownItemTypes = [];
+let allActivities = [];
+let filteredActivities = [];
+let currentActivitiesPage = 1;
+let activitiesPageSize = 10;
 let currentToolFilters = {
   search: "",
   category: "",
@@ -223,6 +227,9 @@ function showAdminSection(sectionId, options = {}) {
     case "usersSection":
       loadUsers();
       break;
+    case "activitiesSection":
+      loadActivities();
+      break;
   }
 }
 
@@ -304,6 +311,180 @@ function displayRecentActivities(activities) {
     `,
     )
     .join("");
+}
+
+async function loadActivities() {
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.ACTIVITY_LOGS, {
+      method: "GET",
+    });
+
+    if (response.success) {
+      allActivities = response.data || [];
+      applyActivityFilters({ resetPage: true });
+    }
+  } catch (error) {
+    console.error("Error loading activities:", error);
+    showToast("Gagal memuat data aktivitas", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+function applyActivityFilters(options = {}) {
+  const search =
+    document.getElementById("activitySearchInput")?.value.toLowerCase().trim() ||
+    "";
+
+  filteredActivities = allActivities.filter((activity) => {
+    if (!search) return true;
+
+    const searchable = [
+      activity.full_name,
+      activity.username,
+      activity.action,
+      activity.description,
+      activity.entity_type,
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return searchable.includes(search);
+  });
+
+  if (options.resetPage) {
+    currentActivitiesPage = 1;
+  }
+
+  displayActivities(filteredActivities);
+}
+
+function displayActivities(activities) {
+  const container = document.getElementById("activitiesList");
+  const totalCountElement = document.getElementById("activitiesPaginationCount");
+  if (!container) return;
+
+  const totalItems = activities.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / activitiesPageSize));
+  currentActivitiesPage = Math.min(currentActivitiesPage, totalPages);
+  const startIndex = (currentActivitiesPage - 1) * activitiesPageSize;
+  const visibleActivities = activities.slice(
+    startIndex,
+    startIndex + activitiesPageSize,
+  );
+
+  if (totalCountElement) {
+    totalCountElement.textContent = `Total ${totalItems} items`;
+  }
+
+  renderActivitiesPagination(totalItems, totalPages);
+
+  if (totalItems === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-history"></i>
+        <p>Tidak ada aktivitas ditemukan</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = visibleActivities
+    .map(
+      (activity) => `
+        <div class="activity-item activity-row">
+          <div class="activity-info">
+            <strong>${escapeHtml(activity.full_name || activity.username || "-")}</strong>
+            <p>${escapeHtml(activity.description || activity.action || "-")}</p>
+            <div class="activity-meta">
+              <span class="badge badge-primary">${escapeHtml(activity.action || "-")}</span>
+              <span>${escapeHtml(activity.entity_type || "-")}</span>
+              ${
+                activity.entity_id
+                  ? `<span>ID: ${escapeHtml(activity.entity_id)}</span>`
+                  : ""
+              }
+            </div>
+          </div>
+          <div class="activity-time">
+            ${formatDateWIB(activity.created_at)}
+          </div>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function renderActivitiesPagination(totalItems, totalPages) {
+  const paginationElement = document.getElementById("activitiesPagination");
+  const pageSizeElement = document.getElementById("activitiesPageSize");
+  if (!paginationElement) return;
+
+  if (pageSizeElement) {
+    pageSizeElement.value = String(activitiesPageSize);
+  }
+
+  if (totalItems === 0) {
+    paginationElement.innerHTML = "";
+    return;
+  }
+
+  const pageButtons = [];
+  const startPage = Math.max(1, currentActivitiesPage - 1);
+  const endPage = Math.min(totalPages, currentActivitiesPage + 1);
+
+  for (let page = startPage; page <= endPage; page += 1) {
+    pageButtons.push(`
+      <button
+        class="pagination-btn ${page === currentActivitiesPage ? "active" : ""}"
+        onclick="changeActivitiesPage(${page})"
+      >
+        ${page}
+      </button>
+    `);
+  }
+
+  paginationElement.innerHTML = `
+    <button
+      class="pagination-btn"
+      onclick="changeActivitiesPage(${Math.max(1, currentActivitiesPage - 1)})"
+      ${currentActivitiesPage <= 1 ? "disabled" : ""}
+      aria-label="Halaman sebelumnya"
+    >
+      <i class="fas fa-chevron-left"></i>
+    </button>
+    ${pageButtons.join("")}
+    <button
+      class="pagination-btn"
+      onclick="changeActivitiesPage(${Math.min(totalPages, currentActivitiesPage + 1)})"
+      ${currentActivitiesPage >= totalPages ? "disabled" : ""}
+      aria-label="Halaman berikutnya"
+    >
+      <i class="fas fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+function changeActivitiesPage(page) {
+  currentActivitiesPage = page;
+  displayActivities(filteredActivities);
+}
+
+function changeActivitiesPageSize() {
+  const pageSizeElement = document.getElementById("activitiesPageSize");
+  const nextPageSize = parseInt(pageSizeElement?.value || "10", 10);
+
+  if (!Number.isNaN(nextPageSize) && nextPageSize > 0) {
+    activitiesPageSize = nextPageSize;
+    currentActivitiesPage = 1;
+    displayActivities(filteredActivities);
+  }
+}
+
+function filterActivities() {
+  applyActivityFilters({ resetPage: true });
 }
 
 function openDashboardListModal(title, content) {

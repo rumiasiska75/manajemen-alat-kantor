@@ -218,6 +218,13 @@
                     >
                         <i class="fas fa-users"></i> Pengguna
                     </a>
+                    <a
+                        href="#"
+                        onclick="showAdminSection('activitiesSection')"
+                        class="navbar-item"
+                    >
+                        <i class="fas fa-history"></i> Aktivitas
+                    </a>
                 </div>
                 <div class="navbar-user">
                     <button
@@ -301,6 +308,45 @@
                         </h3>
                         <div id="recentActivities" class="activity-list">
                             <!-- Activities will be loaded here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Activities Section -->
+                <section id="activitiesSection" class="admin-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-history"></i> Semua Aktivitas</h2>
+                    </div>
+
+                    <div class="filters-bar">
+                        <input
+                            type="text"
+                            id="activitySearchInput"
+                            placeholder="Cari nama pengguna, aksi, atau deskripsi aktivitas..."
+                            onkeyup="filterActivities()"
+                        />
+                    </div>
+
+                    <div id="activitiesList" class="activity-list activity-page-list">
+                        <!-- Activities will be loaded here -->
+                    </div>
+                    <div class="pagination-toolbar">
+                        <div id="activitiesPaginationCount" class="pagination-count">
+                            Total 0 items
+                        </div>
+                        <div class="pagination-controls">
+                            <div id="activitiesPagination" class="pagination-buttons"></div>
+                            <select
+                                id="activitiesPageSize"
+                                class="pagination-size"
+                                onchange="changeActivitiesPageSize()"
+                            >
+                                <option value="10" selected>10 / page</option>
+                                <option value="20">20 / page</option>
+                                <option value="30">30 / page</option>
+                                <option value="40">40 / page</option>
+                                <option value="100">100 / page</option>
+                            </select>
                         </div>
                     </div>
                 </section>
