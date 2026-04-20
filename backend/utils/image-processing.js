@@ -44,34 +44,50 @@ function formatWatermarkTimestamp(timestamp) {
 
 function buildWatermarkText({ username, actionLabel, timestamp }) {
   const safeUsername = String(username || "user").trim() || "user";
-  return `"${safeUsername}" ${actionLabel} - ${formatWatermarkTimestamp(timestamp)}`;
+  return `"${safeUsername}" ${actionLabel}\n${formatWatermarkTimestamp(timestamp)}`;
 }
 
-function buildWatermarkSvg({ width, height, watermarkText }) {
-  const fontSize = Math.max(20, Math.round(width * 0.022));
-  const paddingX = Math.max(18, Math.round(width * 0.02));
-  const paddingY = Math.max(16, Math.round(height * 0.025));
-  const boxHeight = fontSize + paddingY * 2;
+function buildWatermarkSvg({ width, watermarkText }) {
+  const lines = String(watermarkText)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const fontSize = Math.max(18, Math.round(width * 0.021));
+  const lineGap = Math.max(8, Math.round(fontSize * 0.35));
+  const paddingX = Math.max(18, Math.round(width * 0.024));
+  const paddingY = Math.max(14, Math.round(fontSize * 0.7));
+  const outerMargin = Math.max(14, Math.round(width * 0.018));
+  const textBlockHeight =
+    lines.length * fontSize + Math.max(0, lines.length - 1) * lineGap;
+  const boxHeight = textBlockHeight + paddingY * 2;
   const boxWidth = Math.min(
-    width - paddingX * 2,
-    Math.max(360, Math.round(width * 0.78)),
+    Math.max(280, Math.round(width * 0.48)),
+    Math.max(320, width - outerMargin * 2),
   );
-  const boxX = width - boxWidth - paddingX;
-  const boxY = height - boxHeight - paddingY;
+  const overlayWidth = boxWidth + outerMargin * 2;
+  const overlayHeight = boxHeight + outerMargin * 2;
+  const boxX = outerMargin;
+  const boxY = outerMargin;
   const textX = boxX + paddingX;
-  const textY = boxY + boxHeight / 2 + fontSize * 0.35;
+  const firstLineY = boxY + paddingY + fontSize;
+  const textSpans = lines
+    .map((line, index) => {
+      const dy = index === 0 ? 0 : fontSize + lineGap;
+      return `<tspan x="${textX}" dy="${dy}">${escapeXml(line)}</tspan>`;
+    })
+    .join("");
 
   return `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${overlayWidth}" height="${overlayHeight}" viewBox="0 0 ${overlayWidth} ${overlayHeight}" xmlns="http://www.w3.org/2000/svg">
       <rect x="${boxX}" y="${boxY}" width="${boxWidth}" height="${boxHeight}" rx="${Math.round(fontSize * 0.45)}" fill="rgba(0, 0, 0, 0.68)" />
       <text
         x="${textX}"
-        y="${textY}"
+        y="${firstLineY}"
         fill="#ffffff"
         font-size="${fontSize}"
         font-family="Arial, Helvetica, sans-serif"
         font-weight="700"
-      >${escapeXml(watermarkText)}</text>
+      >${textSpans}</text>
     </svg>
   `;
 }
@@ -95,11 +111,6 @@ async function processUploadedImage({
   const targetWidth = metadata.width
     ? Math.min(metadata.width, maxWidth)
     : maxWidth;
-  const targetHeight =
-    metadata.width && metadata.height
-      ? Math.round(metadata.height * (targetWidth / metadata.width))
-      : maxWidth;
-
   let pipeline = sharp(resolvedInputPath, { failOnError: false })
     .rotate()
     .resize({
@@ -114,12 +125,10 @@ async function processUploadedImage({
         input: Buffer.from(
           buildWatermarkSvg({
             width: targetWidth,
-            height: targetHeight,
             watermarkText,
           }),
         ),
-        left: 0,
-        top: 0,
+        gravity: "southeast",
       },
     ]);
   }
