@@ -19,6 +19,7 @@ const API_ENDPOINTS = {
     DELETE: (id) => `${API_BASE_URL}/tools/${id}`,
     BY_CODE: (code) => `${API_BASE_URL}/tools/code/${code}`,
     CATEGORIES: `${API_BASE_URL}/tools/categories/list`,
+    METADATA: `${API_BASE_URL}/tools/metadata/list`,
     REGENERATE_QR: (id) => `${API_BASE_URL}/tools/${id}/regenerate-qr`,
     EXPORT_ALL: `${API_BASE_URL}/tools/export/all`,
   },
@@ -356,7 +357,14 @@ function confirmAction(message) {
 function getImageUrl(path) {
   if (!path) return DEFAULT_TOOL_PLACEHOLDER;
   if (path.startsWith("http")) return path;
-  return window.location.origin + path;
+  const token = getAuthToken();
+  const url = new URL(path, window.location.origin);
+
+  if (token) {
+    url.searchParams.set("token", token);
+  }
+
+  return url.toString();
 }
 
 // ==================== DARK MODE FUNCTIONS ====================

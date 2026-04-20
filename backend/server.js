@@ -36,9 +36,46 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/qrcodes", express.static(path.join(__dirname, "qrcodes")));
+const {
+  authenticateToken,
+  authenticateAssetToken,
+  isAdmin,
+} = require("./middleware/auth");
+
+function serveProtectedAsset(baseDir) {
+  return (req, res) => {
+    const requestedPath = req.path.replace(/^\/+/, "");
+    const absolutePath = path.normalize(path.join(baseDir, requestedPath));
+
+    if (!absolutePath.startsWith(path.normalize(baseDir))) {
+      return res.status(403).json({
+        success: false,
+        message: "Akses file tidak valid.",
+      });
+    }
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({
+        success: false,
+        message: "File tidak ditemukan.",
+      });
+    }
+
+    res.sendFile(absolutePath);
+  };
+}
+
+// Protected asset files
+app.get(
+  "/uploads/*",
+  authenticateAssetToken,
+  serveProtectedAsset(path.join(__dirname, "uploads")),
+);
+app.get(
+  "/qrcodes/*",
+  authenticateAssetToken,
+  serveProtectedAsset(path.join(__dirname, "qrcodes")),
+);
 
 // Serve frontend
 app.use(express.static(path.join(__dirname, "../frontend")));
@@ -63,8 +100,8 @@ app.get("/api/health", (req, res) => {
 // Dashboard stats endpoint (Admin only)
 app.get(
   "/api/dashboard/stats",
-  require("./middleware/auth").authenticateToken,
-  require("./middleware/auth").isAdmin,
+  authenticateToken,
+  isAdmin,
   async (req, res) => {
     try {
       const stats = {};
@@ -133,7 +170,7 @@ app.get(
 // User dashboard stats
 app.get(
   "/api/dashboard/user-stats",
-  require("./middleware/auth").authenticateToken,
+  authenticateToken,
   async (req, res) => {
     try {
       const stats = {};

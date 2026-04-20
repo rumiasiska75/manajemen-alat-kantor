@@ -46,14 +46,19 @@ function formatPurchasePeriod(month, year) {
   return `${String(month).padStart(2, "0")}/${year}`;
 }
 
+function formatDateTimeForExport(value) {
+  if (!value) return "-";
+  return value;
+}
+
 function buildMetricsSelect() {
   return `
     SELECT
       t.*,
       u.username AS created_by_username,
       u.full_name AS created_by_name,
-      COALESCE(out_logs.total_out, 0) AS barang_keluar,
-      COALESCE(in_logs.total_in, 0) AS barang_masuk,
+      out_logs.last_borrowed_at AS barang_keluar,
+      in_logs.last_returned_at AS barang_masuk,
       CASE
         WHEN t.available_quantity > 0 THEN 'tersedia'
         ELSE 'dipinjam'
@@ -63,7 +68,7 @@ function buildMetricsSelect() {
     LEFT JOIN (
       SELECT
         bi.tool_id,
-        SUM(bi.quantity) AS total_out
+        MAX(b.borrow_date) AS last_borrowed_at
       FROM borrowing_items bi
       JOIN borrowings b ON b.id = bi.borrowing_id
       WHERE b.status IN ('active', 'approved', 'returned')
@@ -72,10 +77,10 @@ function buildMetricsSelect() {
     LEFT JOIN (
       SELECT
         bi.tool_id,
-        SUM(bi.quantity) AS total_in
+        MAX(b.actual_return_date) AS last_returned_at
       FROM borrowing_items bi
       JOIN borrowings b ON b.id = bi.borrowing_id
-      WHERE b.status = 'returned'
+      WHERE b.status = 'returned' AND b.actual_return_date IS NOT NULL
       GROUP BY bi.tool_id
     ) in_logs ON in_logs.tool_id = t.id
   `;
@@ -242,8 +247,8 @@ router.get("/export/all", authenticateToken, isAdmin, async (req, res) => {
       "Nama Barang": tool.name,
       Kategori: tool.category,
       Jenis: tool.item_type || "-",
-      "Barang Masuk": tool.barang_masuk || 0,
-      "Barang Keluar": tool.barang_keluar || 0,
+      "Barang Masuk": formatDateTimeForExport(tool.barang_masuk),
+      "Barang Keluar": formatDateTimeForExport(tool.barang_keluar),
       Keterangan: tool.description || "-",
       "Bulan dan Tahun Pembelian": formatPurchasePeriod(
         tool.purchase_month,
@@ -266,6 +271,34 @@ router.get("/export/all", authenticateToken, isAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Terjadi kesalahan saat menyiapkan export Excel.",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/metadata/list", authenticateToken, async (req, res) => {
+  try {
+    const [categories, itemTypes] = await Promise.all([
+      database.query(
+        "SELECT DISTINCT category FROM tools WHERE category IS NOT NULL AND TRIM(category) != '' ORDER BY category",
+      ),
+      database.query(
+        "SELECT DISTINCT item_type FROM tools WHERE item_type IS NOT NULL AND TRIM(item_type) != '' ORDER BY item_type",
+      ),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        categories: categories.map((row) => row.category),
+        item_types: itemTypes.map((row) => row.item_type),
+      },
+    });
+  } catch (error) {
+    console.error("Error getting tool metadata:", error);
+    res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan saat mengambil metadata peralatan.",
       error: error.message,
     });
   }

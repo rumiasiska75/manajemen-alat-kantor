@@ -67,10 +67,16 @@ let allTools = [];
 let allBorrowings = [];
 let currentEditingTool = null;
 let selectedToolIds = new Set();
+let knownCategories = [];
+let knownItemTypes = [];
 
 function formatPurchasePeriod(month, year) {
   if (!month || !year) return "-";
   return `${String(month).padStart(2, "0")}/${year}`;
+}
+
+function formatInventoryActivity(value) {
+  return value ? formatDateWIB(value) : "-";
 }
 
 function getAvailabilityBadge(status) {
@@ -126,7 +132,7 @@ function showAdminSection(sectionId) {
       break;
     case "toolsSection":
       loadTools();
-      loadCategories();
+      loadToolMetadata();
       break;
     case "borrowingsSection":
       loadBorrowings();
@@ -292,8 +298,8 @@ function displayTools(tools) {
                     <span>${tool.item_type || "-"}</span>
                 </div>
                 <div class="tool-card-info">
-                    <p><i class="fas fa-arrow-down"></i> Barang Masuk: ${tool.barang_masuk || 0}</p>
-                    <p><i class="fas fa-arrow-up"></i> Barang Keluar: ${tool.barang_keluar || 0}</p>
+                    <p><i class="fas fa-arrow-down"></i> Barang Masuk: ${formatInventoryActivity(tool.barang_masuk)}</p>
+                    <p><i class="fas fa-arrow-up"></i> Barang Keluar: ${formatInventoryActivity(tool.barang_keluar)}</p>
                     <p><i class="fas fa-calendar-alt"></i> Pembelian: ${formatPurchasePeriod(tool.purchase_month, tool.purchase_year)}</p>
                     <p><i class="fas fa-stethoscope"></i> ${tool.description || "Belum ada keterangan"}</p>
                 </div>
@@ -388,33 +394,42 @@ function filterTools() {
 /**
  * Load categories for filter
  */
-async function loadCategories() {
+async function loadToolMetadata() {
   try {
-    const response = await apiRequest(API_ENDPOINTS.TOOLS.CATEGORIES, {
+    const response = await apiRequest(API_ENDPOINTS.TOOLS.METADATA, {
       method: "GET",
     });
 
     if (response.success) {
       const categoryFilter = document.getElementById("categoryFilter");
       const categoryList = document.getElementById("categoryList");
+      const itemTypeList = document.getElementById("itemTypeList");
+      knownCategories = response.data.categories || [];
+      knownItemTypes = response.data.item_types || [];
 
-      const options = response.data
+      const categoryOptions = knownCategories
         .map((cat) => `<option value="${cat}">${cat}</option>`)
         .join("");
 
       if (categoryFilter) {
         categoryFilter.innerHTML =
-          '<option value="">Semua Kategori</option>' + options;
+          '<option value="">Semua Kategori</option>' + categoryOptions;
       }
 
       if (categoryList) {
-        categoryList.innerHTML = response.data
+        categoryList.innerHTML = knownCategories
           .map((cat) => `<option value="${cat}">`)
+          .join("");
+      }
+
+      if (itemTypeList) {
+        itemTypeList.innerHTML = knownItemTypes
+          .map((itemType) => `<option value="${itemType}">`)
           .join("");
       }
     }
   } catch (error) {
-    console.error("Error loading categories:", error);
+    console.error("Error loading tool metadata:", error);
   }
 }
 
@@ -427,6 +442,7 @@ function showAddToolModal() {
     "Tambah Peralatan Baru";
   document.getElementById("toolForm").reset();
   document.getElementById("toolId").value = "";
+  loadToolMetadata();
   document.getElementById("toolModal").classList.add("active");
 }
 
@@ -444,6 +460,7 @@ function showBatchAddToolModal() {
   if (!rowsContainer) return;
 
   rowsContainer.innerHTML = "";
+  loadToolMetadata();
   addBatchToolRow();
   addBatchToolRow();
   addBatchToolRow();
@@ -558,7 +575,7 @@ function addBatchToolRow(defaultValues = {}) {
     <td><input type="text" data-field="serial_number" value="${defaultValues.serial_number || ""}" required></td>
     <td><input type="text" data-field="name" value="${defaultValues.name || ""}" required></td>
     <td><input type="text" data-field="category" value="${defaultValues.category || ""}" list="categoryList" required></td>
-    <td><input type="text" data-field="item_type" value="${defaultValues.item_type || ""}" required></td>
+    <td><input type="text" data-field="item_type" value="${defaultValues.item_type || ""}" list="itemTypeList" required></td>
     <td><input type="number" data-field="purchase_month" value="${defaultValues.purchase_month || ""}" min="1" max="12" placeholder="MM"></td>
     <td><input type="number" data-field="purchase_year" value="${defaultValues.purchase_year || ""}" min="1900" max="2999" placeholder="YYYY"></td>
     <td>
@@ -604,6 +621,7 @@ async function editTool(toolId) {
 
     if (response.success) {
       currentEditingTool = response.data;
+      loadToolMetadata();
 
       document.getElementById("toolModalTitle").textContent = "Edit Peralatan";
       document.getElementById("toolId").value = response.data.id;
@@ -980,11 +998,11 @@ async function showToolDetail(toolId) {
                     </div>
                     <div class="detail-item">
                         <label>Barang Masuk</label>
-                        <p>${tool.barang_masuk || 0}</p>
+                        <p>${formatInventoryActivity(tool.barang_masuk)}</p>
                     </div>
                     <div class="detail-item">
                         <label>Barang Keluar</label>
-                        <p>${tool.barang_keluar || 0}</p>
+                        <p>${formatInventoryActivity(tool.barang_keluar)}</p>
                     </div>
                     <div class="detail-item">
                         <label>Pembelian</label>

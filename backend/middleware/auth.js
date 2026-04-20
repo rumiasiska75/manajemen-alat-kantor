@@ -137,8 +137,62 @@ const generateToken = (userId, username, role) => {
   );
 };
 
+const authenticateAssetToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers["authorization"];
+    const bearerToken = authHeader && authHeader.split(" ")[1];
+    const token = bearerToken || req.query.token;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Token tidak ditemukan. Silakan login terlebih dahulu.",
+      });
+    }
+
+    jwt.verify(token, JWT_SECRET, async (err, decoded) => {
+      if (err) {
+        return res.status(403).json({
+          success: false,
+          message: "Token tidak valid atau telah kadaluarsa.",
+        });
+      }
+
+      try {
+        const user = await database.get(
+          "SELECT id, username, email, full_name, role, phone FROM users WHERE id = ?",
+          [decoded.userId],
+        );
+
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            message: "User tidak ditemukan.",
+          });
+        }
+
+        req.user = user;
+        next();
+      } catch (dbError) {
+        console.error("Database error in asset auth middleware:", dbError);
+        return res.status(500).json({
+          success: false,
+          message: "Terjadi kesalahan pada server.",
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error in authenticateAssetToken middleware:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan pada server.",
+    });
+  }
+};
+
 module.exports = {
   authenticateToken,
+  authenticateAssetToken,
   isAdmin,
   isAuthenticated,
   optionalAuth,
