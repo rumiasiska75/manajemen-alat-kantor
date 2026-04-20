@@ -69,6 +69,15 @@ let currentEditingTool = null;
 let selectedToolIds = new Set();
 let knownCategories = [];
 let knownItemTypes = [];
+let currentToolFilters = {
+  search: "",
+  category: "",
+  condition: "",
+  availability: "",
+};
+let currentToolPage = 1;
+let toolPageSize = 20;
+let filteredTools = [];
 
 function formatPurchasePeriod(month, year) {
   if (!month || !year) return "-";
@@ -168,7 +177,7 @@ async function loadAdminDashboard() {
 /**
  * Show admin section
  */
-function showAdminSection(sectionId) {
+function showAdminSection(sectionId, options = {}) {
   // Hide all sections
   document.querySelectorAll(".admin-section").forEach((section) => {
     section.classList.remove("active");
@@ -191,7 +200,21 @@ function showAdminSection(sectionId) {
       loadDashboardStats();
       break;
     case "toolsSection":
-      loadTools();
+      if (options?.toolFilters) {
+        const searchInput = document.getElementById("toolSearchInput");
+        const categoryFilter = document.getElementById("categoryFilter");
+        const conditionFilter = document.getElementById("conditionFilter");
+        const availabilityFilter = document.getElementById("availabilityFilter");
+
+        if (searchInput) searchInput.value = options.toolFilters.search || "";
+        if (categoryFilter) categoryFilter.value = options.toolFilters.category || "";
+        if (conditionFilter) conditionFilter.value = options.toolFilters.condition || "";
+        if (availabilityFilter) {
+          availabilityFilter.value = options.toolFilters.availability || "";
+        }
+      }
+
+      loadTools(options?.toolFilters || {});
       loadToolMetadata();
       break;
     case "borrowingsSection":
@@ -201,6 +224,17 @@ function showAdminSection(sectionId) {
       loadUsers();
       break;
   }
+}
+
+function openToolsInventory(filters = {}) {
+  showAdminSection("toolsSection", {
+    toolFilters: {
+      search: filters.search || "",
+      category: filters.category || "",
+      condition: filters.condition || "",
+      availability: filters.availability || "",
+    },
+  });
 }
 
 /**
@@ -389,35 +423,9 @@ function showBorrowingDetailFromAudit(borrowingId) {
 }
 
 async function showDashboardToolsModal(availableOnly = false) {
-  try {
-    showLoading();
-
-    const url = availableOnly
-      ? `${API_ENDPOINTS.TOOLS.LIST}?available=true`
-      : API_ENDPOINTS.TOOLS.LIST;
-    const response = await apiRequest(url, {
-      method: "GET",
-    });
-
-    if (!response.success) {
-      throw new Error("Gagal mengambil daftar alat");
-    }
-
-    const title = availableOnly ? "Daftar Alat Tersedia" : "Daftar Total Alat";
-    const emptyText = availableOnly
-      ? "Tidak ada alat yang sedang tersedia."
-      : "Belum ada data alat.";
-
-    openDashboardListModal(
-      title,
-      renderDashboardToolsList(response.data || [], emptyText),
-    );
-  } catch (error) {
-    console.error("Error showing dashboard tools modal:", error);
-    showToast(error.message || "Gagal memuat daftar alat", "error");
-  } finally {
-    hideLoading();
-  }
+  openToolsInventory({
+    availability: availableOnly ? "tersedia" : "",
+  });
 }
 
 async function showDashboardUsersModal() {
@@ -560,9 +568,32 @@ async function loadTools(filters = {}) {
     let url = API_ENDPOINTS.TOOLS.LIST;
     const params = new URLSearchParams();
 
-    if (filters.category) params.append("category", filters.category);
-    if (filters.condition) params.append("condition", filters.condition);
-    if (filters.search) params.append("search", filters.search);
+    const nextFilters = {
+      search:
+        filters.search !== undefined
+          ? filters.search
+          : document.getElementById("toolSearchInput")?.value || "",
+      category:
+        filters.category !== undefined
+          ? filters.category
+          : document.getElementById("categoryFilter")?.value || "",
+      condition:
+        filters.condition !== undefined
+          ? filters.condition
+          : document.getElementById("conditionFilter")?.value || "",
+      availability:
+        filters.availability !== undefined
+          ? filters.availability
+          : document.getElementById("availabilityFilter")?.value || "",
+    };
+
+    currentToolFilters = nextFilters;
+    currentToolPage =
+      typeof filters.page === "number" && filters.page > 0 ? filters.page : 1;
+
+    if (nextFilters.category) params.append("category", nextFilters.category);
+    if (nextFilters.condition) params.append("condition", nextFilters.condition);
+    if (nextFilters.search) params.append("search", nextFilters.search);
 
     if (params.toString()) {
       url += "?" + params.toString();
@@ -574,12 +605,16 @@ async function loadTools(filters = {}) {
 
     if (response.success) {
       allTools = response.data;
+      filteredTools = applyToolAvailabilityFilter(
+        allTools,
+        nextFilters.availability,
+      );
       selectedToolIds = new Set(
         [...selectedToolIds].filter((toolId) =>
-          allTools.some((tool) => tool.id === toolId),
+          filteredTools.some((tool) => tool.id === toolId),
         ),
       );
-      displayTools(allTools);
+      displayTools(filteredTools);
       updateSelectedToolsUI();
     }
   } catch (error) {
@@ -590,14 +625,41 @@ async function loadTools(filters = {}) {
   }
 }
 
+function applyToolAvailabilityFilter(tools, availability = "") {
+  if (!availability) return [...tools];
+
+  if (availability === "tersedia") {
+    return tools.filter((tool) => tool.availability_status === "tersedia");
+  }
+
+  if (availability === "dipinjam") {
+    return tools.filter((tool) => tool.availability_status === "dipinjam");
+  }
+
+  return [...tools];
+}
+
 /**
  * Display tools in grid
  */
 function displayTools(tools) {
   const container = document.getElementById("toolsList");
+  const totalCountElement = document.getElementById("toolsPaginationCount");
   if (!container) return;
 
-  if (tools.length === 0) {
+  const totalItems = tools.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / toolPageSize));
+  currentToolPage = Math.min(currentToolPage, totalPages);
+  const startIndex = (currentToolPage - 1) * toolPageSize;
+  const visibleTools = tools.slice(startIndex, startIndex + toolPageSize);
+
+  if (totalCountElement) {
+    totalCountElement.textContent = `Total ${totalItems} items`;
+  }
+
+  renderToolsPagination(totalItems, totalPages);
+
+  if (totalItems === 0) {
     container.innerHTML = `
             <div class="empty-state">
                 <i class="fas fa-toolbox"></i>
@@ -609,7 +671,7 @@ function displayTools(tools) {
     return;
   }
 
-  container.innerHTML = tools
+  container.innerHTML = visibleTools
     .map(
       (tool) => `
         <div class="tool-card inventory-card ${selectedToolIds.has(tool.id) ? "selected" : ""}" onclick="showToolDetail(${tool.id})">
@@ -659,6 +721,74 @@ function displayTools(tools) {
     .join("");
 }
 
+function renderToolsPagination(totalItems, totalPages) {
+  const paginationElement = document.getElementById("toolsPagination");
+  const pageSizeElement = document.getElementById("toolsPageSize");
+  if (!paginationElement) return;
+
+  if (pageSizeElement) {
+    pageSizeElement.value = String(toolPageSize);
+  }
+
+  if (totalItems === 0) {
+    paginationElement.innerHTML = "";
+    return;
+  }
+
+  const pageButtons = [];
+  const startPage = Math.max(1, currentToolPage - 1);
+  const endPage = Math.min(totalPages, currentToolPage + 1);
+
+  for (let page = startPage; page <= endPage; page += 1) {
+    pageButtons.push(`
+      <button
+        class="pagination-btn ${page === currentToolPage ? "active" : ""}"
+        onclick="changeToolsPage(${page})"
+      >
+        ${page}
+      </button>
+    `);
+  }
+
+  paginationElement.innerHTML = `
+    <button
+      class="pagination-btn"
+      onclick="changeToolsPage(${Math.max(1, currentToolPage - 1)})"
+      ${currentToolPage <= 1 ? "disabled" : ""}
+      aria-label="Halaman sebelumnya"
+    >
+      <i class="fas fa-chevron-left"></i>
+    </button>
+    ${pageButtons.join("")}
+    <button
+      class="pagination-btn"
+      onclick="changeToolsPage(${Math.min(totalPages, currentToolPage + 1)})"
+      ${currentToolPage >= totalPages ? "disabled" : ""}
+      aria-label="Halaman berikutnya"
+    >
+      <i class="fas fa-chevron-right"></i>
+    </button>
+  `;
+}
+
+function changeToolsPage(page) {
+  currentToolPage = page;
+  displayTools(filteredTools);
+  updateSelectedToolsUI();
+}
+
+function changeToolsPageSize() {
+  const pageSizeElement = document.getElementById("toolsPageSize");
+  const nextPageSize = parseInt(pageSizeElement?.value || "20", 10);
+
+  if (!Number.isNaN(nextPageSize) && nextPageSize > 0) {
+    toolPageSize = nextPageSize;
+    currentToolPage = 1;
+    displayTools(filteredTools);
+    updateSelectedToolsUI();
+  }
+}
+
 function updateSelectedToolsUI() {
   const selectedCountElement = document.getElementById("selectedToolsCount");
   const toggleButton = document.getElementById("toggleSelectToolsButton");
@@ -668,8 +798,11 @@ function updateSelectedToolsUI() {
   }
 
   if (toggleButton) {
+    const startIndex = (currentToolPage - 1) * toolPageSize;
+    const visibleTools = filteredTools.slice(startIndex, startIndex + toolPageSize);
     const allVisibleSelected =
-      allTools.length > 0 && allTools.every((tool) => selectedToolIds.has(tool.id));
+      visibleTools.length > 0 &&
+      visibleTools.every((tool) => selectedToolIds.has(tool.id));
     toggleButton.innerHTML = allVisibleSelected
       ? '<i class="fas fa-square"></i> Batal Pilih Semua'
       : '<i class="fas fa-check-square"></i> Pilih Semua';
@@ -685,21 +818,23 @@ function toggleToolSelection(toolId, event) {
     selectedToolIds.add(toolId);
   }
 
-  displayTools(allTools);
+  displayTools(filteredTools);
   updateSelectedToolsUI();
 }
 
 function toggleSelectAllVisibleTools() {
-  if (allTools.length === 0) {
+  if (filteredTools.length === 0) {
     showToast("Tidak ada alat pada daftar saat ini", "warning");
     return;
   }
 
-  const allVisibleSelected = allTools.every((tool) =>
+  const startIndex = (currentToolPage - 1) * toolPageSize;
+  const visibleTools = filteredTools.slice(startIndex, startIndex + toolPageSize);
+  const allVisibleSelected = visibleTools.every((tool) =>
     selectedToolIds.has(tool.id),
   );
 
-  allTools.forEach((tool) => {
+  visibleTools.forEach((tool) => {
     if (allVisibleSelected) {
       selectedToolIds.delete(tool.id);
     } else {
@@ -707,18 +842,18 @@ function toggleSelectAllVisibleTools() {
     }
   });
 
-  displayTools(allTools);
+  displayTools(filteredTools);
   updateSelectedToolsUI();
 }
 
 function clearToolSelection() {
   selectedToolIds.clear();
-  displayTools(allTools);
+  displayTools(filteredTools);
   updateSelectedToolsUI();
 }
 
 function getSelectedTools() {
-  return allTools.filter((tool) => selectedToolIds.has(tool.id));
+  return filteredTools.filter((tool) => selectedToolIds.has(tool.id));
 }
 
 /**
@@ -728,8 +863,9 @@ function filterTools() {
   const search = document.getElementById("toolSearchInput").value;
   const category = document.getElementById("categoryFilter").value;
   const condition = document.getElementById("conditionFilter").value;
+  const availability = document.getElementById("availabilityFilter").value;
 
-  loadTools({ search, category, condition });
+  loadTools({ search, category, condition, availability, page: 1 });
 }
 
 /**
@@ -1558,6 +1694,16 @@ function displayBorrowings(borrowings) {
 async function showBorrowingDetail(borrowingId) {
   try {
     showLoading();
+
+    const borrowingModal = document.getElementById("borrowingDetailModal");
+    const hasParentModalOpen =
+      document.getElementById("activeBorrowingsModal")?.classList.contains("active") ||
+      document.getElementById("userAuditModal")?.classList.contains("active") ||
+      document.getElementById("dashboardListModal")?.classList.contains("active");
+
+    if (borrowingModal) {
+      borrowingModal.classList.toggle("modal-front", Boolean(hasParentModalOpen));
+    }
 
     const response = await apiRequest(
       API_ENDPOINTS.BORROWINGS.GET(borrowingId),

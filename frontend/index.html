@@ -244,7 +244,7 @@
                         <div
                             class="stat-card stat-card-action"
                             onclick="showDashboardToolsModal()"
-                            title="Lihat seluruh daftar alat"
+                            title="Buka Inventaris Peralatan"
                         >
                             <div class="stat-icon" style="background: #4caf50">
                                 <i class="fas fa-toolbox"></i>
@@ -257,7 +257,7 @@
                         <div
                             class="stat-card stat-card-action"
                             onclick="showDashboardToolsModal(true)"
-                            title="Lihat daftar alat yang tersedia"
+                            title="Buka Inventaris Peralatan dengan filter alat tersedia"
                         >
                             <div class="stat-icon" style="background: #2196f3">
                                 <i class="fas fa-check-circle"></i>
@@ -347,6 +347,11 @@
                             <option value="rusak ringan">Rusak Ringan</option>
                             <option value="rusak berat">Rusak Berat</option>
                         </select>
+                        <select id="availabilityFilter" onchange="filterTools()">
+                            <option value="">Semua Status Alat</option>
+                            <option value="tersedia">Peralatan Tersedia</option>
+                            <option value="dipinjam">Peralatan Sedang Dipinjam</option>
+                        </select>
                     </div>
 
                     <div class="batch-toolbar">
@@ -385,6 +390,25 @@
 
                     <div id="toolsList" class="tools-grid">
                         <!-- Tools will be loaded here -->
+                    </div>
+                    <div class="pagination-toolbar">
+                        <div id="toolsPaginationCount" class="pagination-count">
+                            Total 0 items
+                        </div>
+                        <div class="pagination-controls">
+                            <div id="toolsPagination" class="pagination-buttons"></div>
+                            <select
+                                id="toolsPageSize"
+                                class="pagination-size"
+                                onchange="changeToolsPageSize()"
+                            >
+                                <option value="10">10 / page</option>
+                                <option value="20" selected>20 / page</option>
+                                <option value="30">30 / page</option>
+                                <option value="40">40 / page</option>
+                                <option value="100">100 / page</option>
+                            </select>
+                        </div>
                     </div>
                 </section>
 
