@@ -193,7 +193,7 @@ async function createToolRecord(toolData, userId) {
       image_path,
       created_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       serialNumber,
       name,
