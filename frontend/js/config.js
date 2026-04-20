@@ -71,9 +71,9 @@ function parseAppDate(dateInput) {
     return new Date(`${value}T00:00:00+07:00`);
   }
 
-  // SQLite timestamps like "2026-04-19 12:34:56" are stored without offset.
+  // SQLite timestamps like "2026-04-19 12:34:56" are stored as WIB values.
   if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-    return new Date(`${value.replace(" ", "T")}Z`);
+    return new Date(`${value.replace(" ", "T")}+07:00`);
   }
 
   // Treat ISO timestamps without explicit offset as UTC as well.
