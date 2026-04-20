@@ -6,6 +6,11 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
+const {
+  buildWatermarkText,
+  deleteLocalFile,
+  processUploadedImage,
+} = require("../utils/image-processing");
 
 // Helper function untuk format tanggal WIB
 function getWIBDateTime() {
@@ -29,6 +34,36 @@ function formatDateWIB(date) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function getProcessedEvidencePath(file) {
+  const parsedFile = path.parse(file.filename);
+  return {
+    absolutePath: path.join(file.destination, `${parsedFile.name}.jpg`),
+    relativePath: `/uploads/evidence/${parsedFile.name}.jpg`,
+  };
+}
+
+async function processEvidenceUpload(file, { username, actionLabel, timestamp }) {
+  const processedPath = getProcessedEvidencePath(file);
+
+  await processUploadedImage({
+    inputPath: file.path,
+    outputPath: processedPath.absolutePath,
+    watermarkText: buildWatermarkText({
+      username,
+      actionLabel,
+      timestamp,
+    }),
+  });
+
+  return processedPath.relativePath;
+}
+
+function getStoredFileAbsolutePath(filePath) {
+  if (!filePath) return null;
+  const relativePath = String(filePath).replace(/^[/\\]+/, "");
+  return path.join(__dirname, "..", relativePath);
 }
 
 // Configure multer for photo evidence uploads
@@ -244,6 +279,7 @@ router.post(
   authenticateToken,
   upload.single("photo_evidence"),
   async (req, res) => {
+    let photoPath = null;
     try {
       const { items, expected_return_date, notes } = req.body;
 
@@ -252,6 +288,7 @@ router.post(
       try {
         borrowingItems = typeof items === "string" ? JSON.parse(items) : items;
       } catch (parseError) {
+        deleteLocalFile(req.file?.path);
         return res.status(400).json({
           success: false,
           message: "Format data alat tidak valid.",
@@ -264,6 +301,7 @@ router.post(
         !Array.isArray(borrowingItems) ||
         borrowingItems.length === 0
       ) {
+        deleteLocalFile(req.file?.path);
         return res.status(400).json({
           success: false,
           message: "Minimal harus ada 1 alat yang dipinjam.",
@@ -273,6 +311,7 @@ router.post(
       // Validate each item and check availability
       for (let item of borrowingItems) {
         if (!item.tool_id || !item.quantity || item.quantity < 1) {
+          deleteLocalFile(req.file?.path);
           return res.status(400).json({
             success: false,
             message: "Data alat tidak valid.",
@@ -285,6 +324,7 @@ router.post(
         );
 
         if (!tool) {
+          deleteLocalFile(req.file?.path);
           return res.status(404).json({
             success: false,
             message: `Alat dengan ID ${item.tool_id} tidak ditemukan.`,
@@ -292,6 +332,7 @@ router.post(
         }
 
         if (tool.available_quantity < item.quantity) {
+          deleteLocalFile(req.file?.path);
           return res.status(400).json({
             success: false,
             message: `Peralatan ${tool.name} tidak tersedia dalam jumlah yang diminta. Tersedia: ${tool.available_quantity}`,
@@ -299,9 +340,15 @@ router.post(
         }
       }
 
-      const photoPath = req.file
-        ? `/uploads/evidence/${req.file.filename}`
-        : null;
+      const borrowTimestamp = getWIBDateTime();
+
+      if (req.file) {
+        photoPath = await processEvidenceUpload(req.file, {
+          username: req.user.username,
+          actionLabel: "Pinjam",
+          timestamp: borrowTimestamp,
+        });
+      }
 
       // Create borrowing transaction
       const borrowingResult = await database.run(
@@ -312,12 +359,12 @@ router.post(
         [
           req.user.id,
           "active",
-          getWIBDateTime(),
+          borrowTimestamp,
           expected_return_date || null,
           notes || null,
           photoPath,
-          getWIBDateTime(),
-          getWIBDateTime(),
+          borrowTimestamp,
+          borrowTimestamp,
         ],
       );
 
@@ -383,6 +430,11 @@ router.post(
         data: newBorrowing,
       });
     } catch (error) {
+      if (photoPath) {
+        deleteLocalFile(getStoredFileAbsolutePath(photoPath));
+      } else {
+        deleteLocalFile(req.file?.path);
+      }
       console.error("Error creating borrowing:", error);
       res.status(500).json({
         success: false,
@@ -401,6 +453,7 @@ router.put(
   authenticateToken,
   upload.single("photo_evidence"),
   async (req, res) => {
+    let photoPath = null;
     try {
       const { id } = req.params;
       const { items, notes } = req.body;
@@ -412,6 +465,7 @@ router.put(
       );
 
       if (!borrowing) {
+        deleteLocalFile(req.file?.path);
         return res.status(404).json({
           success: false,
           message: "Peminjaman tidak ditemukan.",
@@ -420,6 +474,7 @@ router.put(
 
       // Check permission
       if (req.user.role !== "admin" && borrowing.user_id !== req.user.id) {
+        deleteLocalFile(req.file?.path);
         return res.status(403).json({
           success: false,
           message:
@@ -429,6 +484,7 @@ router.put(
 
       // Check if already returned
       if (borrowing.status === "returned") {
+        deleteLocalFile(req.file?.path);
         return res.status(400).json({
           success: false,
           message: "Peminjaman ini sudah dikembalikan.",
@@ -480,9 +536,16 @@ router.put(
       }
 
       // Update borrowing status
-      const photoPath = req.file
-        ? `/uploads/evidence/${req.file.filename}`
-        : borrowing.photo_evidence;
+      const returnTimestamp = getWIBDateTime();
+      photoPath = borrowing.photo_evidence;
+
+      if (req.file) {
+        photoPath = await processEvidenceUpload(req.file, {
+          username: req.user.username,
+          actionLabel: "Kembali",
+          timestamp: returnTimestamp,
+        });
+      }
 
       await database.run(
         `UPDATE borrowings
@@ -492,8 +555,12 @@ router.put(
            notes = COALESCE(?, notes),
            updated_at = ?
        WHERE id = ?`,
-        [getWIBDateTime(), photoPath, notes, getWIBDateTime(), id],
+        [returnTimestamp, photoPath, notes, returnTimestamp, id],
       );
+
+      if (req.file && borrowing.photo_evidence) {
+        deleteLocalFile(getStoredFileAbsolutePath(borrowing.photo_evidence));
+      }
 
       // Log activity
       await database.run(
@@ -527,6 +594,11 @@ router.put(
         data: updatedBorrowing,
       });
     } catch (error) {
+      if (photoPath && req.file) {
+        deleteLocalFile(getStoredFileAbsolutePath(photoPath));
+      } else {
+        deleteLocalFile(req.file?.path);
+      }
       console.error("Error returning borrowing:", error);
       res.status(500).json({
         success: false,

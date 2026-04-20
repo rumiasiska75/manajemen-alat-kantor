@@ -7,17 +7,17 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-
-function ensureDirectoryExists(directoryPath) {
-  if (!fs.existsSync(directoryPath)) {
-    fs.mkdirSync(directoryPath, { recursive: true });
-  }
-}
+const {
+  deleteLocalFile,
+  ensureDirectoryExists,
+  processUploadedImage,
+} = require("../utils/image-processing");
 
 function deleteFileIfExists(filePath) {
   if (!filePath) return;
 
-  const resolvedPath = path.join(__dirname, "..", filePath);
+  const relativePath = String(filePath).replace(/^[/\\]+/, "");
+  const resolvedPath = path.join(__dirname, "..", relativePath);
   if (!fs.existsSync(resolvedPath)) return;
 
   try {
@@ -49,6 +49,25 @@ function formatPurchasePeriod(month, year) {
 function formatDateTimeForExport(value) {
   if (!value) return "-";
   return value;
+}
+
+function getProcessedToolImagePath(file) {
+  const parsedFile = path.parse(file.filename);
+  return {
+    absolutePath: path.join(file.destination, `${parsedFile.name}.jpg`),
+    relativePath: `/uploads/${parsedFile.name}.jpg`,
+  };
+}
+
+async function processToolImageUpload(file) {
+  const processedPath = getProcessedToolImagePath(file);
+
+  await processUploadedImage({
+    inputPath: file.path,
+    outputPath: processedPath.absolutePath,
+  });
+
+  return processedPath.relativePath;
 }
 
 async function getToolBorrowingLogs(toolId) {
@@ -703,6 +722,7 @@ router.post(
 );
 
 router.post("/", authenticateToken, isAdmin, upload.single("image"), async (req, res) => {
+  let imagePath = null;
   try {
     const {
       serial_number,
@@ -718,7 +738,10 @@ router.post("/", authenticateToken, isAdmin, upload.single("image"), async (req,
       quantity,
     } = req.body;
 
-    const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    if (req.file) {
+      imagePath = await processToolImageUpload(req.file);
+    }
+
     const { tool: newTool } = await createToolRecord(
       {
         serial_number: serial_number || tool_code,
@@ -760,6 +783,11 @@ router.post("/", authenticateToken, isAdmin, upload.single("image"), async (req,
       warning: newTool.qr_code_path ? undefined : "QR code generation failed",
     });
   } catch (error) {
+    if (imagePath) {
+      deleteFileIfExists(imagePath);
+    } else {
+      deleteLocalFile(req.file?.path);
+    }
     console.error("Error creating tool:", error);
     res.status(error.status || 500).json({
       success: false,
@@ -803,6 +831,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
 });
 
 router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (req, res) => {
+  let nextImagePath = null;
   try {
     const { id } = req.params;
     const existingTool = await database.get("SELECT * FROM tools WHERE id = ?", [
@@ -810,6 +839,7 @@ router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (re
     ]);
 
     if (!existingTool) {
+      deleteLocalFile(req.file?.path);
       return res.status(404).json({
         success: false,
         message: "Peralatan tidak ditemukan.",
@@ -827,6 +857,7 @@ router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (re
       );
 
       if (codeExists) {
+        deleteLocalFile(req.file?.path);
         return res.status(409).json({
           success: false,
           message: "Serial Number sudah digunakan.",
@@ -874,9 +905,9 @@ router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (re
       updateParams.push(normalizeText(req.body.condition) || "baik");
     }
     if (req.file) {
+      nextImagePath = await processToolImageUpload(req.file);
       updateFields.push("image_path = ?");
-      updateParams.push(`/uploads/${req.file.filename}`);
-      deleteFileIfExists(existingTool.image_path);
+      updateParams.push(nextImagePath);
     }
 
     if (updateFields.length === 0) {
@@ -894,6 +925,10 @@ router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (re
       `UPDATE tools SET ${updateFields.join(", ")} WHERE id = ?`,
       updateParams,
     );
+
+    if (nextImagePath) {
+      deleteFileIfExists(existingTool.image_path);
+    }
 
     if (serialNumber && serialNumber !== existingTool.serial_number) {
       try {
@@ -925,6 +960,11 @@ router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (re
       },
     });
   } catch (error) {
+    if (nextImagePath) {
+      deleteFileIfExists(nextImagePath);
+    } else {
+      deleteLocalFile(req.file?.path);
+    }
     console.error("Error updating tool:", error);
     res.status(500).json({
       success: false,
