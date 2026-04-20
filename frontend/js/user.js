@@ -66,6 +66,58 @@ function formatDateShortWIB(dateString) {
 let borrowCart = [];
 let qrScanner = null;
 let isScannerActive = false;
+let scannerRestartTimeout = null;
+let scanInProgress = false;
+let scannerShouldAutoRun = false;
+let scannerStartInFlight = false;
+
+function getBorrowSectionElement() {
+  return document.getElementById("borrowToolsSection");
+}
+
+function isBorrowSectionVisible() {
+  const borrowSection = getBorrowSectionElement();
+  return !!borrowSection && borrowSection.classList.contains("active");
+}
+
+function clearScannerRestartTimeout() {
+  if (scannerRestartTimeout) {
+    clearTimeout(scannerRestartTimeout);
+    scannerRestartTimeout = null;
+  }
+}
+
+function updateScannerToggleLabel() {
+  const label = document.getElementById("scannerToggleText");
+  if (!label) return;
+
+  if (isScannerActive || scannerShouldAutoRun) {
+    label.textContent = "Stop Scan";
+  } else {
+    label.textContent = "Mulai Scan";
+  }
+}
+
+function scheduleScannerRestart(delay = 1000) {
+  clearScannerRestartTimeout();
+
+  if (!scannerShouldAutoRun || !isBorrowSectionVisible()) {
+    updateScannerToggleLabel();
+    return;
+  }
+
+  updateScannerToggleLabel();
+  scannerRestartTimeout = setTimeout(async () => {
+    scannerRestartTimeout = null;
+
+    if (!scannerShouldAutoRun || !isBorrowSectionVisible()) {
+      updateScannerToggleLabel();
+      return;
+    }
+
+    await startQRScanner({ silent: true });
+  }, delay);
+}
 
 /**
  * Load user dashboard
@@ -83,6 +135,8 @@ async function loadUserDashboard() {
  * Show user section
  */
 function showUserSection(sectionId) {
+  const wasBorrowSectionVisible = isBorrowSectionVisible();
+
   // Hide all sections
   document.querySelectorAll(".user-section").forEach((section) => {
     section.classList.remove("active");
@@ -102,13 +156,32 @@ function showUserSection(sectionId) {
   // Load section content
   switch (sectionId) {
     case "userDashboardSection":
+      scannerShouldAutoRun = false;
+      clearScannerRestartTimeout();
+      if (wasBorrowSectionVisible || isScannerActive) {
+        stopQRScanner({ silent: true, manual: false });
+      }
       loadUserStats();
       break;
     case "borrowToolsSection":
-      // Scanner will be initialized when user clicks start
+      scannerShouldAutoRun = true;
+      updateScannerToggleLabel();
+      startQRScanner({ silent: true });
       break;
     case "myBorrowingsSection":
+      scannerShouldAutoRun = false;
+      clearScannerRestartTimeout();
+      if (wasBorrowSectionVisible || isScannerActive) {
+        stopQRScanner({ silent: true, manual: false });
+      }
       loadMyBorrowings();
+      break;
+    default:
+      scannerShouldAutoRun = false;
+      clearScannerRestartTimeout();
+      if (wasBorrowSectionVisible || isScannerActive) {
+        stopQRScanner({ silent: true, manual: false });
+      }
       break;
   }
 }
@@ -189,9 +262,11 @@ function displayUserRecentBorrowings(borrowings) {
  * Toggle QR Scanner
  */
 function toggleQRScanner() {
-  if (isScannerActive) {
-    stopQRScanner();
+  if (isScannerActive || scannerShouldAutoRun) {
+    scannerShouldAutoRun = false;
+    stopQRScanner({ manual: true });
   } else {
+    scannerShouldAutoRun = true;
     startQRScanner();
   }
 }
@@ -199,8 +274,15 @@ function toggleQRScanner() {
 /**
  * Start QR Scanner
  */
-async function startQRScanner() {
+async function startQRScanner(options = {}) {
+  const { silent = false } = options;
+
   try {
+    if (scannerStartInFlight || isScannerActive || !isBorrowSectionVisible()) {
+      updateScannerToggleLabel();
+      return;
+    }
+
     const qrReaderElement = document.getElementById("qrReader");
     if (!qrReaderElement) {
       showToast("QR Reader element not found", "error");
@@ -212,6 +294,9 @@ async function startQRScanner() {
       qrScanner = new Html5Qrcode("qrReader");
     }
 
+    scannerStartInFlight = true;
+    clearScannerRestartTimeout();
+
     // Get camera permissions and start scanning
     const config = {
       fps: 10,
@@ -219,16 +304,14 @@ async function startQRScanner() {
       aspectRatio: 1.0,
     };
 
-    await qrScanner.start(
-      { facingMode: "environment" },
-      config,
-      onScanSuccess,
-      onScanError,
-    );
+    await qrScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanError);
 
     isScannerActive = true;
-    document.getElementById("scannerToggleText").textContent = "Stop Scan";
-    showToast("Scanner aktif", "info");
+    updateScannerToggleLabel();
+
+    if (!silent) {
+      showToast("Scanner aktif", "info");
+    }
   } catch (error) {
     console.error("Error starting QR scanner:", error);
 
@@ -242,31 +325,50 @@ async function startQRScanner() {
           onScanError,
         );
         isScannerActive = true;
-        document.getElementById("scannerToggleText").textContent = "Stop Scan";
-        showToast("Scanner aktif (kamera depan)", "info");
+        updateScannerToggleLabel();
+
+        if (!silent) {
+          showToast("Scanner aktif (kamera depan)", "info");
+        }
       }
     } catch (fallbackError) {
-      showToast(
-        "Gagal mengakses kamera. Pastikan browser memiliki izin kamera.",
-        "error",
-      );
+      if (!silent) {
+        showToast(
+          "Gagal mengakses kamera. Pastikan browser memiliki izin kamera.",
+          "error",
+        );
+      }
     }
+  } finally {
+    scannerStartInFlight = false;
   }
 }
 
 /**
  * Stop QR Scanner
  */
-async function stopQRScanner() {
+async function stopQRScanner(options = {}) {
+  const { silent = false, manual = true } = options;
+
   try {
+    clearScannerRestartTimeout();
+
+    if (manual) {
+      scannerShouldAutoRun = false;
+    }
+
     if (qrScanner && isScannerActive) {
       await qrScanner.stop();
       isScannerActive = false;
-      document.getElementById("scannerToggleText").textContent = "Mulai Scan";
-      showToast("Scanner dihentikan", "info");
+
+      if (!silent) {
+        showToast("Scanner dihentikan", "info");
+      }
     }
   } catch (error) {
     console.error("Error stopping QR scanner:", error);
+  } finally {
+    updateScannerToggleLabel();
   }
 }
 
@@ -274,6 +376,11 @@ async function stopQRScanner() {
  * Handle successful QR scan
  */
 async function onScanSuccess(decodedText, decodedResult) {
+  if (scanInProgress) {
+    return;
+  }
+
+  scanInProgress = true;
   console.log("QR Code detected:", decodedText);
 
   try {
@@ -282,7 +389,7 @@ async function onScanSuccess(decodedText, decodedResult) {
 
     if (qrData.tool_id && (qrData.serial_number || qrData.tool_code)) {
       // Stop scanner temporarily
-      await stopQRScanner();
+      await stopQRScanner({ silent: true, manual: false });
 
       // Fetch tool details
       await addToolToCart(
@@ -297,12 +404,15 @@ async function onScanSuccess(decodedText, decodedResult) {
     console.log("Trying as tool code:", decodedText);
 
     try {
-      await stopQRScanner();
+      await stopQRScanner({ silent: true, manual: false });
       await addToolByCode(decodedText);
     } catch (codeError) {
       console.error("Error processing QR code:", error);
       showToast("Format QR Code tidak valid", "error");
     }
+  } finally {
+    scanInProgress = false;
+    scheduleScannerRestart(1000);
   }
 }
 
@@ -839,7 +949,9 @@ document.addEventListener("DOMContentLoaded", () => {
  * Cleanup when leaving borrow section
  */
 window.addEventListener("beforeunload", () => {
+  scannerShouldAutoRun = false;
+  clearScannerRestartTimeout();
   if (qrScanner && isScannerActive) {
-    stopQRScanner();
+    stopQRScanner({ silent: true, manual: false });
   }
 });

@@ -259,7 +259,11 @@
                                 <p>Alat Tersedia</p>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div
+                            class="stat-card stat-card-action"
+                            onclick="showActiveBorrowingsModal()"
+                            title="Lihat daftar peminjaman yang masih aktif"
+                        >
                             <div class="stat-icon" style="background: #ff9800">
                                 <i class="fas fa-handshake"></i>
                             </div>
@@ -558,7 +562,9 @@
                                 <div id="qrReader" class="qr-reader"></div>
                                 <p class="scan-info">
                                     Arahkan kamera ke QR Code pada alat yang
-                                    ingin dipinjam
+                                    ingin dipinjam. Kamera akan otomatis aktif
+                                    saat halaman ini dibuka dan siap scan lagi
+                                    1 detik setelah QR terbaca.
                                 </p>
                                 <button
                                     class="btn btn-secondary"
@@ -617,11 +623,11 @@
                                             type="file"
                                             id="borrowPhoto"
                                             accept="image/*"
-                                            capture="environment"
                                         />
                                         <small
-                                            >Ambil foto semua alat yang akan
-                                            dipinjam</small
+                                            >Di Android/iPhone Anda bisa pilih
+                                            dari galeri atau ambil gambar
+                                            langsung</small
                                         >
                                     </div>
                                     <button
@@ -931,6 +937,27 @@
             </div>
         </div>
 
+        <!-- Active Borrowings Modal -->
+        <div id="activeBorrowingsModal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3>Daftar Peminjaman Aktif</h3>
+                    <button
+                        class="close-btn"
+                        onclick="closeActiveBorrowingsModal()"
+                    >
+                        &times;
+                    </button>
+                </div>
+                <div
+                    id="activeBorrowingsContent"
+                    class="borrowing-detail-content"
+                >
+                    <!-- Active borrowings will be loaded here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Return Tool Modal -->
         <div id="returnModal" class="modal">
             <div class="modal-content">
@@ -961,9 +988,11 @@
                             type="file"
                             id="returnPhoto"
                             accept="image/*"
-                            capture="environment"
                         />
-                        <small>Ambil foto semua alat yang dikembalikan</small>
+                        <small
+                            >Di Android/iPhone Anda bisa pilih dari galeri
+                            atau ambil gambar langsung</small
+                        >
                     </div>
                     <div class="modal-actions">
                         <button
@@ -1060,6 +1089,21 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- User Audit Modal -->
+        <div id="userAuditModal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3 id="userAuditModalTitle">Audit Pengguna</h3>
+                    <button class="close-btn" onclick="closeUserAuditModal()">
+                        &times;
+                    </button>
+                </div>
+                <div id="userAuditContent" class="tool-detail-content">
+                    <!-- User audit content will be loaded here -->
+                </div>
             </div>
         </div>
 

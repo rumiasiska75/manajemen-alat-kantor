@@ -272,6 +272,110 @@ function displayRecentActivities(activities) {
     .join("");
 }
 
+function getBorrowingCardMarkup(borrowing) {
+  return `
+    <div class="borrowing-card" onclick="showBorrowingDetail(${borrowing.id})">
+        <div class="borrowing-header">
+            <div>
+                <div class="borrowing-user">
+                    <i class="fas fa-user"></i> ${borrowing.full_name || borrowing.username}
+                </div>
+                <div class="borrowing-date">
+                    <i class="fas fa-calendar"></i> ${formatDateShortWIB(borrowing.borrow_date)}
+                </div>
+            </div>
+            ${getStatusBadge(borrowing.status)}
+        </div>
+        <div class="borrowing-items">
+            <p><strong>${borrowing.items ? borrowing.items.length : 0} alat dipinjam</strong></p>
+            ${
+              borrowing.items
+                ? borrowing.items
+                    .map(
+                      (item) => `
+                <div class="borrowing-item">
+                    <i class="fas fa-box"></i>
+                    <span>${item.tool_name} (${item.quantity}x)</span>
+                </div>
+            `,
+                    )
+                    .join("")
+                : ""
+            }
+        </div>
+        ${
+          borrowing.status === "pending"
+            ? `
+        <div class="borrowing-actions">
+            <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); approveBorrowing(${borrowing.id})">
+                <i class="fas fa-check"></i> Setujui
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); cancelBorrowing(${borrowing.id})">
+                <i class="fas fa-times"></i> Tolak
+            </button>
+        </div>
+        `
+            : ""
+        }
+    </div>
+  `;
+}
+
+async function showActiveBorrowingsModal() {
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.BORROWINGS.LIST, {
+      method: "GET",
+    });
+
+    if (!response.success) {
+      throw new Error("Gagal mengambil data peminjaman aktif");
+    }
+
+    const activeBorrowings = (response.data || []).filter((borrowing) =>
+      ["active", "approved"].includes(borrowing.status),
+    );
+
+    const container = document.getElementById("activeBorrowingsContent");
+    if (!container) return;
+
+    if (!activeBorrowings.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <i class="fas fa-handshake"></i>
+          <p>Tidak ada peminjaman aktif saat ini</p>
+          <small>Semua peminjaman sudah dikembalikan atau belum ada transaksi aktif.</small>
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div class="detail-item active-borrowings-summary">
+          <label>Total Peminjaman Aktif</label>
+          <p>${activeBorrowings.length} transaksi belum dikembalikan</p>
+        </div>
+        <div class="borrowings-list">
+          ${activeBorrowings.map(getBorrowingCardMarkup).join("")}
+        </div>
+      `;
+    }
+
+    document.getElementById("activeBorrowingsModal").classList.add("active");
+  } catch (error) {
+    console.error("Error showing active borrowings modal:", error);
+    showToast(error.message || "Gagal memuat peminjaman aktif", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+function closeActiveBorrowingsModal() {
+  const modal = document.getElementById("activeBorrowingsModal");
+  if (modal) {
+    modal.classList.remove("active");
+  }
+}
+
 // ==================== TOOLS MANAGEMENT ====================
 
 /**
@@ -1272,54 +1376,7 @@ function displayBorrowings(borrowings) {
   }
 
   container.innerHTML = borrowings
-    .map(
-      (borrowing) => `
-        <div class="borrowing-card" onclick="showBorrowingDetail(${borrowing.id})">
-            <div class="borrowing-header">
-                <div>
-                    <div class="borrowing-user">
-                        <i class="fas fa-user"></i> ${borrowing.full_name || borrowing.username}
-                    </div>
-                    <div class="borrowing-date">
-                        <i class="fas fa-calendar"></i> ${formatDateShortWIB(borrowing.borrow_date)}
-                    </div>
-                </div>
-                ${getStatusBadge(borrowing.status)}
-            </div>
-            <div class="borrowing-items">
-                <p><strong>${borrowing.items ? borrowing.items.length : 0} alat dipinjam</strong></p>
-                ${
-                  borrowing.items
-                    ? borrowing.items
-                        .map(
-                          (item) => `
-                    <div class="borrowing-item">
-                        <i class="fas fa-box"></i>
-                        <span>${item.tool_name} (${item.quantity}x)</span>
-                    </div>
-                `,
-                        )
-                        .join("")
-                    : ""
-                }
-            </div>
-            ${
-              borrowing.status === "pending"
-                ? `
-            <div class="borrowing-actions">
-                <button class="btn btn-sm btn-success" onclick="event.stopPropagation(); approveBorrowing(${borrowing.id})">
-                    <i class="fas fa-check"></i> Setujui
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); cancelBorrowing(${borrowing.id})">
-                    <i class="fas fa-times"></i> Tolak
-                </button>
-            </div>
-            `
-                : ""
-            }
-        </div>
-    `,
-    )
+    .map(getBorrowingCardMarkup)
     .join("");
 }
 
@@ -1495,6 +1552,226 @@ async function cancelBorrowing(borrowingId) {
 
 // ==================== USERS MANAGEMENT ====================
 
+function renderUserBorrowingItems(items = [], emptyText = "Tidak ada alat") {
+  if (!items.length) {
+    return `<p class="user-audit-empty">${emptyText}</p>`;
+  }
+
+  return `
+    <div class="user-borrowed-tools">
+      ${items
+        .map(
+          (item) => `
+            <span class="user-borrowed-tool">
+              ${escapeHtml(item.tool_name)}
+              <small>SN-${escapeHtml(item.serial_number || "-")}</small>
+            </span>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderUserBorrowingTimeline(
+  borrowings = [],
+  emptyText = "Belum ada riwayat peminjaman.",
+) {
+  if (!borrowings.length) {
+    return `
+      <div class="empty-state compact-empty-state">
+        <i class="fas fa-clipboard-list"></i>
+        <p>${escapeHtml(emptyText)}</p>
+      </div>
+    `;
+  }
+
+  return borrowings
+    .map(
+      (borrowing) => `
+        <div class="user-audit-borrowing-card">
+          <div class="user-audit-borrowing-header">
+            <div>
+              <strong>Peminjaman #${borrowing.id}</strong>
+              <p>Dipinjam ${formatDateWIB(borrowing.borrow_date)}</p>
+            </div>
+            ${getStatusBadge(borrowing.status)}
+          </div>
+          <div class="user-audit-borrowing-meta">
+            <span><i class="fas fa-box"></i> ${borrowing.items?.length || 0} alat</span>
+            <span><i class="fas fa-clock"></i> Rencana kembali: ${formatDateWIB(borrowing.expected_return_date)}</span>
+            <span><i class="fas fa-check-circle"></i> Aktual kembali: ${formatDateWIB(borrowing.actual_return_date)}</span>
+          </div>
+          ${renderUserBorrowingItems(
+            borrowing.items || [],
+            "Belum ada item alat pada peminjaman ini.",
+          )}
+          ${
+            borrowing.notes
+              ? `<p class="user-audit-note">${escapeHtml(borrowing.notes)}</p>`
+              : ""
+          }
+        </div>
+      `,
+    )
+    .join("");
+}
+
+async function showUserAudit(userId) {
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.USERS.AUDIT(userId), {
+      method: "GET",
+    });
+
+    if (!response.success) {
+      throw new Error("Gagal mengambil audit pengguna");
+    }
+
+    const { user, active_borrowings, borrowing_history } = response.data;
+    const stats = user.statistics || {};
+    const content = `
+      <div class="user-audit-header-card">
+        <div class="user-audit-user-meta">
+          <div class="user-avatar user-avatar-large">
+            ${escapeHtml((user.full_name || "?").charAt(0).toUpperCase())}
+          </div>
+          <div>
+            <h3>${escapeHtml(user.full_name)}</h3>
+            <p>@${escapeHtml(user.username)} | ${escapeHtml(user.email)}</p>
+            <p>
+              ${user.role === "admin" ? '<span class="badge badge-primary">Admin</span>' : '<span class="badge badge-info">User</span>'}
+              ${user.phone ? `<span class="user-inline-separator">|</span>${escapeHtml(user.phone)}` : ""}
+            </p>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="exportUserAuditToExcel(${user.id})">
+          <i class="fas fa-file-export"></i> Export Audit
+        </button>
+      </div>
+
+      <div class="user-audit-stats-grid">
+        <div class="detail-item">
+          <label>Total Peminjaman</label>
+          <p>${stats.total_borrowings || 0}</p>
+        </div>
+        <div class="detail-item">
+          <label>Sedang Meminjam</label>
+          <p>${stats.active_borrowings || 0}</p>
+        </div>
+        <div class="detail-item">
+          <label>Sudah Dikembalikan</label>
+          <p>${stats.returned_borrowings || 0}</p>
+        </div>
+        <div class="detail-item">
+          <label>Dibatalkan</label>
+          <p>${stats.cancelled_borrowings || 0}</p>
+        </div>
+      </div>
+
+      <div class="tool-log-section">
+        <div class="tool-log-header">
+          <label>Sedang Dipinjam Saat Ini</label>
+        </div>
+        <div class="user-audit-section">
+          ${renderUserBorrowingTimeline(
+            active_borrowings,
+            "Pengguna ini tidak sedang meminjam alat.",
+          )}
+        </div>
+      </div>
+
+      <div class="tool-log-section">
+        <div class="tool-log-header">
+          <label>Riwayat Peminjaman</label>
+        </div>
+        <div class="user-audit-section">
+          ${renderUserBorrowingTimeline(
+            borrowing_history,
+            "Belum ada riwayat peminjaman.",
+          )}
+        </div>
+      </div>
+    `;
+
+    document.getElementById("userAuditModalTitle").textContent =
+      `Audit Pengguna: ${user.full_name}`;
+    document.getElementById("userAuditContent").innerHTML = content;
+    document.getElementById("userAuditModal").classList.add("active");
+  } catch (error) {
+    console.error("Error showing user audit:", error);
+    showToast(error.message || "Gagal memuat audit pengguna", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+function closeUserAuditModal() {
+  const modal = document.getElementById("userAuditModal");
+  if (modal) {
+    modal.classList.remove("active");
+  }
+}
+
+async function exportUserAuditToExcel(userId) {
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum siap", "error");
+    return;
+  }
+
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.USERS.EXPORT(userId), {
+      method: "GET",
+    });
+
+    if (!response.success) {
+      throw new Error("Gagal menyiapkan export audit pengguna");
+    }
+
+    const { user, summary, active_borrowings, borrowing_history } = response.data;
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(summary),
+      "Ringkasan",
+    );
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(
+        active_borrowings.length
+          ? active_borrowings
+          : [{ Info: "Tidak ada peminjaman aktif" }],
+      ),
+      "Sedang Dipinjam",
+    );
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.json_to_sheet(
+        borrowing_history.length
+          ? borrowing_history
+          : [{ Info: "Belum ada riwayat peminjaman" }],
+      ),
+      "Riwayat",
+    );
+
+    const today = new Date().toISOString().slice(0, 10);
+    const safeUsername = (user.username || "pengguna").replace(/[^\w-]+/g, "-");
+    XLSX.writeFile(workbook, `audit-user-${safeUsername}-${today}.xlsx`);
+    showToast("Export audit pengguna berhasil", "success");
+  } catch (error) {
+    console.error("Error exporting user audit:", error);
+    showToast(error.message || "Gagal export audit pengguna", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
 /**
  * Load all users
  */
@@ -1502,7 +1779,7 @@ async function loadUsers(filters = {}) {
   try {
     showLoading();
 
-    let url = `${API_BASE_URL}/users`;
+    let url = API_ENDPOINTS.USERS.LIST;
     const params = new URLSearchParams();
 
     const search = document.getElementById("userSearchInput")?.value;
@@ -1551,25 +1828,42 @@ function displayUsers(users) {
   container.innerHTML = users
     .map(
       (user) => `
-    <div class="user-item">
+    <div class="user-item user-audit-card" onclick="showUserAudit(${user.id})">
       <div class="user-info">
         <div class="user-avatar">
-          ${user.full_name.charAt(0).toUpperCase()}
+          ${escapeHtml((user.full_name || "?").charAt(0).toUpperCase())}
         </div>
         <div class="user-details">
-          <h4>${user.full_name}</h4>
-          <p>@${user.username} • ${user.email}</p>
+          <h4>${escapeHtml(user.full_name)}</h4>
+          <p>@${escapeHtml(user.username)} | ${escapeHtml(user.email)}</p>
           <p>
             ${user.role === "admin" ? '<span class="badge badge-primary">Admin</span>' : '<span class="badge badge-info">User</span>'}
-            ${user.phone ? `• ${user.phone}` : ""}
+            ${user.phone ? ` | ${escapeHtml(user.phone)}` : ""}
           </p>
         </div>
       </div>
+      <div class="user-audit-summary">
+        <div class="user-audit-summary-row">
+          <span class="badge badge-warning">Aktif: ${user.active_borrowings || 0}</span>
+          <span class="badge badge-success">Riwayat: ${user.returned_borrowings || 0}</span>
+          <span class="badge badge-primary">Total: ${user.total_borrowings || 0}</span>
+        </div>
+        <div class="user-audit-summary-tools">
+          <strong>Sedang meminjam:</strong>
+          <span>${escapeHtml(user.active_tool_names || "Tidak ada alat aktif")}</span>
+        </div>
+      </div>
       <div class="user-actions">
-        <button class="btn btn-sm btn-primary" onclick="editUser(${user.id})">
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation(); showUserAudit(${user.id})">
+          <i class="fas fa-clipboard-list"></i> Audit
+        </button>
+        <button class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); exportUserAuditToExcel(${user.id})">
+          <i class="fas fa-file-excel"></i> Export
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); editUser(${user.id})">
           <i class="fas fa-edit"></i> Edit
         </button>
-        <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})">
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteUser(${user.id})">
           <i class="fas fa-trash"></i> Hapus
         </button>
       </div>
@@ -1614,7 +1908,7 @@ async function editUser(userId) {
   try {
     showLoading();
 
-    const response = await apiRequest(`${API_BASE_URL}/users/${userId}`, {
+    const response = await apiRequest(API_ENDPOINTS.USERS.GET(userId), {
       method: "GET",
     });
 
@@ -1719,7 +2013,7 @@ async function deleteUser(userId) {
   try {
     showLoading();
 
-    const response = await apiRequest(`${API_BASE_URL}/users/${userId}`, {
+    const response = await apiRequest(API_ENDPOINTS.USERS.GET(userId), {
       method: "DELETE",
     });
 
