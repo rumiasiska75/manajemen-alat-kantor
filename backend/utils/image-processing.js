@@ -83,8 +83,14 @@ async function processUploadedImage({
   watermarkText = null,
 }) {
   ensureDirectoryExists(path.dirname(outputPath));
+  const resolvedInputPath = path.resolve(inputPath);
+  const resolvedOutputPath = path.resolve(outputPath);
+  const tempOutputPath =
+    resolvedInputPath === resolvedOutputPath
+      ? `${resolvedOutputPath}.tmp.jpg`
+      : resolvedOutputPath;
 
-  const inputImage = sharp(inputPath, { failOnError: false }).rotate();
+  const inputImage = sharp(resolvedInputPath, { failOnError: false }).rotate();
   const metadata = await inputImage.metadata();
   const targetWidth = metadata.width
     ? Math.min(metadata.width, maxWidth)
@@ -94,7 +100,7 @@ async function processUploadedImage({
       ? Math.round(metadata.height * (targetWidth / metadata.width))
       : maxWidth;
 
-  let pipeline = sharp(inputPath, { failOnError: false })
+  let pipeline = sharp(resolvedInputPath, { failOnError: false })
     .rotate()
     .resize({
       width: maxWidth,
@@ -123,9 +129,17 @@ async function processUploadedImage({
       quality: IMAGE_QUALITY,
       mozjpeg: true,
     })
-    .toFile(outputPath);
+    .toFile(tempOutputPath);
 
-  deleteLocalFile(inputPath);
+  if (resolvedInputPath === resolvedOutputPath) {
+    deleteLocalFile(resolvedInputPath);
+  }
+
+  fs.renameSync(tempOutputPath, resolvedOutputPath);
+
+  if (resolvedInputPath !== resolvedOutputPath) {
+    deleteLocalFile(resolvedInputPath);
+  }
 }
 
 module.exports = {
