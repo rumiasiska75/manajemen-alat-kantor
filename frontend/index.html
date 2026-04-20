@@ -775,6 +775,15 @@
                         ></textarea>
                     </div>
                     <div class="form-group">
+                        <label for="toolAccessories">Aksesoris</label>
+                        <textarea
+                            id="toolAccessories"
+                            name="accessories"
+                            rows="2"
+                            placeholder="Contoh: charger, tas, tripod mini"
+                        ></textarea>
+                    </div>
+                    <div class="form-group">
                         <label for="toolImage">Foto Alat</label>
                         <input
                             type="file"
@@ -829,8 +838,9 @@
                             <small>
                                 Header yang didukung:
                                 `serial_number`, `name`, `category`,
-                                `item_type`, `purchase_month`,
-                                `purchase_year`, `condition`, `description`
+                                `item_type`, `accessories`,
+                                `purchase_month`, `purchase_year`,
+                                `condition`, `description`
                             </small>
                         </div>
                         <button
@@ -861,6 +871,7 @@
                                     <th>Bulan</th>
                                     <th>Tahun</th>
                                     <th>Kondisi</th>
+                                    <th>Aksesoris</th>
                                     <th>Keterangan</th>
                                     <th>Aksi</th>
                                 </tr>

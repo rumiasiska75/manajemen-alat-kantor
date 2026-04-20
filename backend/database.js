@@ -69,6 +69,7 @@ class Database {
             name TEXT NOT NULL,
             category TEXT NOT NULL,
             item_type TEXT,
+            accessories TEXT,
             description TEXT,
             purchase_month INTEGER,
             purchase_year INTEGER,
@@ -171,6 +172,7 @@ class Database {
             name TEXT NOT NULL,
             category TEXT NOT NULL,
             item_type TEXT,
+            accessories TEXT,
             description TEXT,
             purchase_month INTEGER,
             purchase_year INTEGER,
@@ -193,6 +195,7 @@ class Database {
             name,
             category,
             item_type,
+            accessories,
             description,
             purchase_month,
             purchase_year,
@@ -211,6 +214,7 @@ class Database {
             name,
             category,
             COALESCE(NULLIF(location, ''), category),
+            NULL,
             description,
             NULL,
             NULL,
@@ -242,6 +246,9 @@ class Database {
 
     if (!columnNames.includes('item_type')) {
       addColumnStatements.push(`ALTER TABLE tools ADD COLUMN item_type TEXT`);
+    }
+    if (!columnNames.includes('accessories')) {
+      addColumnStatements.push(`ALTER TABLE tools ADD COLUMN accessories TEXT`);
     }
     if (!columnNames.includes('purchase_month')) {
       addColumnStatements.push(

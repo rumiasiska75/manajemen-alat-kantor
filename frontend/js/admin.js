@@ -361,6 +361,11 @@ function displayTools(tools) {
                     <p><i class="fas fa-arrow-down"></i> Barang Masuk: ${formatInventoryActivity(tool.barang_masuk)}</p>
                     <p><i class="fas fa-arrow-up"></i> Barang Keluar: ${formatInventoryActivity(tool.barang_keluar)}</p>
                     <p><i class="fas fa-calendar-alt"></i> Pembelian: ${formatPurchasePeriod(tool.purchase_month, tool.purchase_year)}</p>
+                    ${
+                      tool.accessories
+                        ? `<p><i class="fas fa-plug"></i> Aksesoris: ${tool.accessories}</p>`
+                        : ""
+                    }
                     <p><i class="fas fa-stethoscope"></i> ${tool.description || "Belum ada keterangan"}</p>
                 </div>
                 <div class="tool-card-footer">
@@ -549,6 +554,7 @@ function normalizeImportedBatchRow(row = {}) {
       .trim(),
     category: String(row.category ?? row.kategori ?? "").trim(),
     item_type: String(row.item_type ?? row.jenis ?? "").trim(),
+    accessories: String(row.accessories ?? row.aksesoris ?? "").trim(),
     purchase_month: String(
       row.purchase_month ?? row.bulan_pembelian ?? row.bulan ?? "",
     ).trim(),
@@ -645,6 +651,7 @@ function addBatchToolRow(defaultValues = {}) {
         <option value="rusak berat" ${defaultValues.condition === "rusak berat" ? "selected" : ""}>Rusak Berat</option>
       </select>
     </td>
+    <td><input type="text" data-field="accessories" value="${defaultValues.accessories || ""}" placeholder="Opsional"></td>
     <td><textarea data-field="description" rows="2">${defaultValues.description || ""}</textarea></td>
     <td>
       <button type="button" class="btn btn-danger btn-sm batch-remove-row" onclick="removeBatchToolRow(this)">
@@ -694,6 +701,8 @@ async function editTool(toolId) {
       document.getElementById("toolPurchaseYear").value =
         response.data.purchase_year || "";
       document.getElementById("toolCondition").value = response.data.condition;
+      document.getElementById("toolAccessories").value =
+        response.data.accessories || "";
       document.getElementById("toolDescription").value =
         response.data.description || "";
 
@@ -770,6 +779,9 @@ document.addEventListener("DOMContentLoaded", () => {
           name: row.querySelector('[data-field="name"]').value.trim(),
           category: row.querySelector('[data-field="category"]').value.trim(),
           item_type: row.querySelector('[data-field="item_type"]').value.trim(),
+          accessories: row
+            .querySelector('[data-field="accessories"]')
+            .value.trim(),
           purchase_month: row
             .querySelector('[data-field="purchase_month"]')
             .value.trim(),
@@ -1110,6 +1122,10 @@ async function showToolDetail(toolId) {
                         <p>${tool.item_type || "-"}</p>
                     </div>
                     <div class="detail-item">
+                        <label>Aksesoris</label>
+                        <p>${tool.accessories || "-"}</p>
+                    </div>
+                    <div class="detail-item">
                         <label>Barang Masuk</label>
                         <p>${formatInventoryActivity(tool.barang_masuk)}</p>
                     </div>
@@ -1325,7 +1341,7 @@ async function showBorrowingDetail(borrowingId) {
       const borrowing = response.data;
 
       const content = `
-                <div class="tool-detail-grid">
+                <div class="tool-detail-grid borrowing-summary-grid">
                     <div class="detail-item">
                         <label>Peminjam</label>
                         <p>${borrowing.full_name || borrowing.username}</p>
@@ -1364,22 +1380,22 @@ async function showBorrowingDetail(borrowingId) {
                     }
                 </div>
 
-                <h4 style="margin-top: 20px; margin-bottom: 15px;">
+                <h4 class="detail-section-title">
                     <i class="fas fa-box"></i> Alat yang Dipinjam
                 </h4>
-                <div class="borrowings-list">
+                <div class="borrowings-list detail-borrowings-list">
                     ${borrowing.items
                       .map(
                         (item) => `
-                        <div class="borrowing-item" style="padding: 12px; background: var(--light-color); border-radius: 8px; margin-bottom: 10px;">
-                            <div style="display: flex; align-items: center; gap: 15px;">
-                                <img src="${getImageUrl(item.image_path)}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
-                                <div style="flex: 1;">
+                        <div class="borrowing-detail-item">
+                            <div class="borrowing-detail-row">
+                                <img src="${getImageUrl(item.image_path)}" class="borrowing-detail-image" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
+                                <div class="borrowing-detail-copy">
                                     <strong>${item.tool_name}</strong>
-                                    <p style="font-size: 12px; color: var(--text-secondary);">
+                                    <p class="borrowing-detail-meta">
                                         Serial: ${item.serial_number || item.tool_code} | Jumlah: ${item.quantity}
                                     </p>
-                                    <p style="font-size: 12px;">
+                                    <p class="borrowing-detail-meta">
                                         Kondisi Awal: ${getConditionBadge(item.condition_before)}
                                         ${item.condition_after ? ` → Kondisi Akhir: ${getConditionBadge(item.condition_after)}` : ""}
                                     </p>
@@ -1394,9 +1410,9 @@ async function showBorrowingDetail(borrowingId) {
                 ${
                   borrowing.photo_evidence
                     ? `
-                <div style="margin-top: 20px;">
-                    <label style="display: block; margin-bottom: 10px; font-weight: 600;">Foto Bukti</label>
-                    <img src="${getImageUrl(borrowing.photo_evidence)}" style="max-width: 100%; border-radius: 8px;">
+                <div class="borrowing-proof-section">
+                    <label>Foto Bukti</label>
+                    <img src="${getImageUrl(borrowing.photo_evidence)}" class="borrowing-proof-image">
                 </div>
                 `
                     : ""

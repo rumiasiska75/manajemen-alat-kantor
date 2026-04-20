@@ -148,6 +148,7 @@ async function createToolRecord(toolData, userId) {
   const name = normalizeText(toolData.name);
   const category = normalizeText(toolData.category);
   const itemType = normalizeText(toolData.item_type);
+  const accessories = normalizeText(toolData.accessories);
   const description = normalizeText(toolData.description);
   const purchaseMonth = normalizePositiveInteger(toolData.purchase_month);
   const purchaseYear = normalizePositiveInteger(toolData.purchase_year);
@@ -182,6 +183,7 @@ async function createToolRecord(toolData, userId) {
       name,
       category,
       item_type,
+      accessories,
       description,
       purchase_month,
       purchase_year,
@@ -197,6 +199,7 @@ async function createToolRecord(toolData, userId) {
       name,
       category,
       itemType,
+      accessories,
       description,
       purchaseMonth,
       purchaseYear,
@@ -270,6 +273,7 @@ router.get("/export/all", authenticateToken, isAdmin, async (req, res) => {
       "Nama Barang": tool.name,
       Kategori: tool.category,
       Jenis: tool.item_type || "-",
+      Aksesoris: tool.accessories || "-",
       "Barang Masuk": formatDateTimeForExport(tool.barang_masuk),
       "Barang Keluar": formatDateTimeForExport(tool.barang_keluar),
       Keterangan: tool.description || "-",
@@ -495,6 +499,7 @@ router.post("/batch", authenticateToken, isAdmin, async (req, res) => {
       name: normalizeText(tool.name),
       category: normalizeText(tool.category),
       item_type: normalizeText(tool.item_type),
+      accessories: normalizeText(tool.accessories),
       description: normalizeText(tool.description),
       purchase_month: normalizePositiveInteger(tool.purchase_month),
       purchase_year: normalizePositiveInteger(tool.purchase_year),
@@ -705,6 +710,7 @@ router.post("/", authenticateToken, isAdmin, upload.single("image"), async (req,
       name,
       category,
       item_type,
+      accessories,
       description,
       purchase_month,
       purchase_year,
@@ -719,6 +725,7 @@ router.post("/", authenticateToken, isAdmin, upload.single("image"), async (req,
         name,
         category,
         item_type,
+        accessories,
         description,
         purchase_month,
         purchase_year,
@@ -845,6 +852,10 @@ router.put("/:id", authenticateToken, isAdmin, upload.single("image"), async (re
     if (req.body.item_type !== undefined) {
       updateFields.push("item_type = ?");
       updateParams.push(normalizeText(req.body.item_type));
+    }
+    if (req.body.accessories !== undefined) {
+      updateFields.push("accessories = ?");
+      updateParams.push(normalizeText(req.body.accessories));
     }
     if (req.body.description !== undefined) {
       updateFields.push("description = ?");
