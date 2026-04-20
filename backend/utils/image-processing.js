@@ -128,7 +128,7 @@ async function processUploadedImage({
             watermarkText,
           }),
         ),
-        gravity: "southeast",
+        gravity: "southwest",
       },
     ]);
   }

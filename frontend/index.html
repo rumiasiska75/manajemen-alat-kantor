@@ -571,7 +571,11 @@
                     </div>
 
                     <div class="stats-grid">
-                        <div class="stat-card">
+                        <div
+                            class="stat-card stat-card-action"
+                            onclick="openMyBorrowingsWithFilter('active')"
+                            title="Lihat riwayat peminjaman aktif"
+                        >
                             <div class="stat-icon" style="background: #ff9800">
                                 <i class="fas fa-handshake"></i>
                             </div>
@@ -580,7 +584,11 @@
                                 <p>Peminjaman Aktif</p>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div
+                            class="stat-card stat-card-action"
+                            onclick="openMyBorrowingsWithFilter('returned')"
+                            title="Lihat riwayat peminjaman yang sudah dikembalikan"
+                        >
                             <div class="stat-icon" style="background: #4caf50">
                                 <i class="fas fa-check-circle"></i>
                             </div>
@@ -589,7 +597,11 @@
                                 <p>Sudah Dikembalikan</p>
                             </div>
                         </div>
-                        <div class="stat-card">
+                        <div
+                            class="stat-card stat-card-action"
+                            onclick="openMyBorrowingsWithFilter('')"
+                            title="Lihat semua riwayat peminjaman"
+                        >
                             <div class="stat-icon" style="background: #2196f3">
                                 <i class="fas fa-clipboard-list"></i>
                             </div>
@@ -700,11 +712,12 @@
                                         ></textarea>
                                     </div>
                                     <div class="form-group">
-                                        <label>Foto Alat yang Dipinjam</label>
+                                        <label>Foto Alat yang Dipinjam *</label>
                                         <input
                                             type="file"
                                             id="borrowPhoto"
                                             accept="image/*"
+                                            required
                                         />
                                         <small
                                             >Di Android/iPhone Anda bisa pilih
@@ -1085,12 +1098,13 @@
                     </div>
                     <div class="form-group">
                         <label for="returnPhoto"
-                            >Foto Alat yang Dikembalikan</label
+                            >Foto Alat yang Dikembalikan *</label
                         >
                         <input
                             type="file"
                             id="returnPhoto"
                             accept="image/*"
+                            required
                         />
                         <small
                             >Di Android/iPhone Anda bisa pilih dari galeri

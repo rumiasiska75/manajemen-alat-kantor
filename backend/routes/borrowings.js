@@ -308,6 +308,13 @@ router.post(
         });
       }
 
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Foto bukti peminjaman wajib diunggah.",
+        });
+      }
+
       // Validate each item and check availability
       for (let item of borrowingItems) {
         if (!item.tool_id || !item.quantity || item.quantity < 1) {
@@ -491,6 +498,13 @@ router.put(
         });
       }
 
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Foto bukti pengembalian wajib diunggah.",
+        });
+      }
+
       // Parse items if provided (for condition updates)
       let returnItems = [];
       if (items) {
@@ -537,15 +551,11 @@ router.put(
 
       // Update borrowing status
       const returnTimestamp = getWIBDateTime();
-      photoPath = borrowing.photo_evidence;
-
-      if (req.file) {
-        photoPath = await processEvidenceUpload(req.file, {
-          username: req.user.username,
-          actionLabel: "Kembali",
-          timestamp: returnTimestamp,
-        });
-      }
+      photoPath = await processEvidenceUpload(req.file, {
+        username: req.user.username,
+        actionLabel: "Kembali",
+        timestamp: returnTimestamp,
+      });
 
       await database.run(
         `UPDATE borrowings

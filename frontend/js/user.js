@@ -186,6 +186,15 @@ function showUserSection(sectionId) {
   }
 }
 
+function openMyBorrowingsWithFilter(status = "") {
+  const statusFilter = document.getElementById("myBorrowingStatusFilter");
+  if (statusFilter) {
+    statusFilter.value = status;
+  }
+
+  showUserSection("myBorrowingsSection");
+}
+
 /**
  * Load user statistics
  */
@@ -618,11 +627,10 @@ async function checkoutBorrowing() {
   const notes = document.getElementById("borrowNotes").value;
   const photoInput = document.getElementById("borrowPhoto");
 
-  // Validate photo
   if (!photoInput.files || photoInput.files.length === 0) {
-    if (!confirmAction("Anda belum menambahkan foto bukti. Lanjutkan?")) {
-      return;
-    }
+    showToast("Foto bukti peminjaman wajib diunggah", "warning");
+    photoInput?.focus();
+    return;
   }
 
   try {
@@ -875,6 +883,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const borrowingId = document.getElementById("returnBorrowingId").value;
       const notes = document.getElementById("returnNotes").value;
       const photoInput = document.getElementById("returnPhoto");
+
+      if (!photoInput.files || photoInput.files.length === 0) {
+        showToast("Foto bukti pengembalian wajib diunggah", "warning");
+        photoInput?.focus();
+        return;
+      }
 
       try {
         showLoading();
