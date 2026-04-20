@@ -272,6 +272,169 @@ function displayRecentActivities(activities) {
     .join("");
 }
 
+function openDashboardListModal(title, content) {
+  const titleElement = document.getElementById("dashboardListModalTitle");
+  const contentElement = document.getElementById("dashboardListModalContent");
+  const modal = document.getElementById("dashboardListModal");
+
+  if (!titleElement || !contentElement || !modal) return;
+
+  titleElement.textContent = title;
+  contentElement.innerHTML = content;
+  modal.classList.add("active");
+}
+
+function closeDashboardListModal() {
+  const modal = document.getElementById("dashboardListModal");
+  if (modal) {
+    modal.classList.remove("active");
+  }
+}
+
+function renderDashboardToolsList(tools = [], emptyText = "Tidak ada alat.") {
+  if (!tools.length) {
+    return `
+      <div class="empty-state">
+        <i class="fas fa-toolbox"></i>
+        <p>${escapeHtml(emptyText)}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="dashboard-list-grid">
+      ${tools
+        .map(
+          (tool) => `
+            <div class="dashboard-entity-card" onclick="showToolDetail(${tool.id})">
+              <img
+                src="${getImageUrl(tool.image_path)}"
+                alt="${escapeHtml(tool.name)}"
+                class="dashboard-entity-image"
+                onload="markImageAsLoaded(this)"
+                onerror="handleImageError(this)"
+              >
+              <div class="dashboard-entity-content">
+                <div class="dashboard-entity-header">
+                  <div>
+                    <strong>${escapeHtml(tool.name)}</strong>
+                    <p>SN-${escapeHtml(tool.serial_number)}</p>
+                  </div>
+                  ${getAvailabilityBadge(tool.availability_status)}
+                </div>
+                <div class="inventory-meta-row">
+                  <span>${escapeHtml(tool.category)}</span>
+                  <span>${escapeHtml(tool.item_type || "-")}</span>
+                </div>
+                <p class="dashboard-entity-copy">
+                  Kondisi: ${escapeHtml(tool.condition || "-")} | Tersedia: ${tool.available_quantity ?? 0}
+                </p>
+              </div>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderDashboardUsersList(users = [], emptyText = "Tidak ada pengguna.") {
+  if (!users.length) {
+    return `
+      <div class="empty-state">
+        <i class="fas fa-users"></i>
+        <p>${escapeHtml(emptyText)}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="dashboard-users-list">
+      ${users
+        .map(
+          (user) => `
+            <div class="dashboard-entity-card dashboard-user-card" onclick="showUserAudit(${user.id})">
+              <div class="user-info">
+                <div class="user-avatar">
+                  ${escapeHtml((user.full_name || "?").charAt(0).toUpperCase())}
+                </div>
+                <div class="user-details">
+                  <h4>${escapeHtml(user.full_name)}</h4>
+                  <p>@${escapeHtml(user.username)} | ${escapeHtml(user.email)}</p>
+                  <p>
+                    ${user.role === "admin" ? '<span class="badge badge-primary">Admin</span>' : '<span class="badge badge-info">User</span>'}
+                    ${user.phone ? ` | ${escapeHtml(user.phone)}` : ""}
+                  </p>
+                </div>
+              </div>
+              <div class="dashboard-user-meta">
+                <span class="badge badge-warning">Aktif: ${user.active_borrowings || 0}</span>
+                <span class="badge badge-primary">Total: ${user.total_borrowings || 0}</span>
+              </div>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+async function showDashboardToolsModal(availableOnly = false) {
+  try {
+    showLoading();
+
+    const url = availableOnly
+      ? `${API_ENDPOINTS.TOOLS.LIST}?available=true`
+      : API_ENDPOINTS.TOOLS.LIST;
+    const response = await apiRequest(url, {
+      method: "GET",
+    });
+
+    if (!response.success) {
+      throw new Error("Gagal mengambil daftar alat");
+    }
+
+    const title = availableOnly ? "Daftar Alat Tersedia" : "Daftar Total Alat";
+    const emptyText = availableOnly
+      ? "Tidak ada alat yang sedang tersedia."
+      : "Belum ada data alat.";
+
+    openDashboardListModal(
+      title,
+      renderDashboardToolsList(response.data || [], emptyText),
+    );
+  } catch (error) {
+    console.error("Error showing dashboard tools modal:", error);
+    showToast(error.message || "Gagal memuat daftar alat", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
+async function showDashboardUsersModal() {
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.USERS.LIST, {
+      method: "GET",
+    });
+
+    if (!response.success) {
+      throw new Error("Gagal mengambil daftar pengguna");
+    }
+
+    openDashboardListModal(
+      "Daftar Total Pengguna",
+      renderDashboardUsersList(response.data || [], "Belum ada pengguna."),
+    );
+  } catch (error) {
+    console.error("Error showing dashboard users modal:", error);
+    showToast(error.message || "Gagal memuat daftar pengguna", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
 function getBorrowingCardMarkup(borrowing) {
   return `
     <div class="borrowing-card" onclick="showBorrowingDetail(${borrowing.id})">
@@ -1589,7 +1752,7 @@ function renderUserBorrowingTimeline(
   return borrowings
     .map(
       (borrowing) => `
-        <div class="user-audit-borrowing-card">
+        <div class="user-audit-borrowing-card" onclick="showBorrowingDetail(${borrowing.id})">
           <div class="user-audit-borrowing-header">
             <div>
               <strong>Peminjaman #${borrowing.id}</strong>

@@ -1280,6 +1280,76 @@ body {
     margin-bottom: 16px;
 }
 
+.dashboard-list-grid,
+.dashboard-users-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.dashboard-entity-card {
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    background: var(--bg-primary);
+    overflow: hidden;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.dashboard-entity-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+}
+
+.dashboard-entity-image {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    display: block;
+}
+
+.dashboard-entity-content {
+    padding: 16px;
+}
+
+.dashboard-entity-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.dashboard-entity-header strong {
+    display: block;
+    font-size: 17px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.dashboard-entity-header p {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.dashboard-entity-copy {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.dashboard-user-card {
+    padding: 16px;
+}
+
+.dashboard-user-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
 .tool-log-header {
     display: flex;
     align-items: center;
@@ -1671,6 +1741,12 @@ img.is-placeholder {
     border-radius: 14px;
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.user-audit-borrowing-card:hover {
+    box-shadow: var(--shadow-sm);
 }
 
 .user-audit-borrowing-header {
@@ -1841,6 +1917,11 @@ img.is-placeholder {
 
     .tool-card-image {
         height: 180px;
+    }
+
+    .dashboard-list-grid,
+    .dashboard-users-list {
+        grid-template-columns: 1fr;
     }
 
     .form-row {
