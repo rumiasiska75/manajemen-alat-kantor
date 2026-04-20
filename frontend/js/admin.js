@@ -302,31 +302,31 @@ function renderDashboardToolsList(tools = [], emptyText = "Tidak ada alat.") {
   }
 
   return `
-    <div class="dashboard-list-grid">
+    <div class="dashboard-list-rows">
       ${tools
         .map(
           (tool) => `
-            <div class="dashboard-entity-card" onclick="showToolDetail(${tool.id})">
+            <div class="dashboard-list-row" onclick="showToolDetail(${tool.id})">
               <img
                 src="${getImageUrl(tool.image_path)}"
                 alt="${escapeHtml(tool.name)}"
-                class="dashboard-entity-image"
+                class="dashboard-list-row-image"
                 onload="markImageAsLoaded(this)"
                 onerror="handleImageError(this)"
               >
-              <div class="dashboard-entity-content">
-                <div class="dashboard-entity-header">
+              <div class="dashboard-list-row-content">
+                <div class="dashboard-list-row-header">
                   <div>
                     <strong>${escapeHtml(tool.name)}</strong>
                     <p>SN-${escapeHtml(tool.serial_number)}</p>
                   </div>
                   ${getAvailabilityBadge(tool.availability_status)}
                 </div>
-                <div class="inventory-meta-row">
+                <div class="inventory-meta-row dashboard-list-row-tags">
                   <span>${escapeHtml(tool.category)}</span>
                   <span>${escapeHtml(tool.item_type || "-")}</span>
                 </div>
-                <p class="dashboard-entity-copy">
+                <p class="dashboard-list-row-copy">
                   Kondisi: ${escapeHtml(tool.condition || "-")} | Tersedia: ${tool.available_quantity ?? 0}
                 </p>
               </div>
@@ -349,12 +349,12 @@ function renderDashboardUsersList(users = [], emptyText = "Tidak ada pengguna.")
   }
 
   return `
-    <div class="dashboard-users-list">
+    <div class="dashboard-list-rows">
       ${users
         .map(
           (user) => `
-            <div class="dashboard-entity-card dashboard-user-card" onclick="showUserAudit(${user.id})">
-              <div class="user-info">
+            <div class="dashboard-list-row dashboard-user-list-row" onclick="showUserAudit(${user.id})">
+              <div class="user-info dashboard-user-list-main">
                 <div class="user-avatar">
                   ${escapeHtml((user.full_name || "?").charAt(0).toUpperCase())}
                 </div>
@@ -377,6 +377,15 @@ function renderDashboardUsersList(users = [], emptyText = "Tidak ada pengguna.")
         .join("")}
     </div>
   `;
+}
+
+function showBorrowingDetailFromAudit(borrowingId) {
+  const modal = document.getElementById("borrowingDetailModal");
+  if (modal) {
+    modal.classList.add("modal-front");
+  }
+
+  showBorrowingDetail(borrowingId);
 }
 
 async function showDashboardToolsModal(availableOnly = false) {
@@ -1654,7 +1663,11 @@ async function showBorrowingDetail(borrowingId) {
  * Close borrowing detail modal
  */
 function closeBorrowingDetailModal() {
-  document.getElementById("borrowingDetailModal").classList.remove("active");
+  const modal = document.getElementById("borrowingDetailModal");
+  if (!modal) return;
+
+  modal.classList.remove("active");
+  modal.classList.remove("modal-front");
 }
 
 /**
@@ -1752,7 +1765,7 @@ function renderUserBorrowingTimeline(
   return borrowings
     .map(
       (borrowing) => `
-        <div class="user-audit-borrowing-card" onclick="showBorrowingDetail(${borrowing.id})">
+        <div class="user-audit-borrowing-card" onclick="showBorrowingDetailFromAudit(${borrowing.id})">
           <div class="user-audit-borrowing-header">
             <div>
               <strong>Peminjaman #${borrowing.id}</strong>
