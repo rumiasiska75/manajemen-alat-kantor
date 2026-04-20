@@ -292,8 +292,14 @@
                 <!-- Tools Section -->
                 <section id="toolsSection" class="admin-section">
                     <div class="section-header">
-                        <h2><i class="fas fa-toolbox"></i> Manajemen Alat</h2>
+                        <h2><i class="fas fa-toolbox"></i> Inventaris Peralatan</h2>
                         <div class="section-actions">
+                            <button
+                                class="btn btn-outline"
+                                onclick="exportAllToolsToExcel()"
+                            >
+                                <i class="fas fa-file-excel"></i> Export Excel
+                            </button>
                             <button
                                 class="btn btn-secondary"
                                 onclick="showBatchAddToolModal()"
@@ -304,7 +310,7 @@
                                 class="btn btn-primary"
                                 onclick="showAddToolModal()"
                             >
-                                <i class="fas fa-plus"></i> Tambah Alat
+                                <i class="fas fa-plus"></i> Tambah Peralatan
                             </button>
                         </div>
                     </div>
@@ -313,7 +319,7 @@
                         <input
                             type="text"
                             id="toolSearchInput"
-                            placeholder="Cari alat..."
+                            placeholder="Cari serial number, nama barang, kategori, atau jenis..."
                             onkeyup="filterTools()"
                         />
                         <select id="categoryFilter" onchange="filterTools()">
@@ -329,8 +335,8 @@
 
                     <div class="batch-toolbar">
                         <div class="batch-toolbar-info">
-                            <strong id="selectedToolsCount">0 alat dipilih</strong>
-                            <span>Pilih beberapa kartu untuk hapus massal atau print QR sekaligus.</span>
+                            <strong id="selectedToolsCount">0 item dipilih</strong>
+                            <span>Pilih beberapa item untuk hapus massal atau cetak QR sekaligus.</span>
                         </div>
                         <div class="batch-toolbar-actions">
                             <button
@@ -669,7 +675,7 @@
         <div id="toolModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 id="toolModalTitle">Tambah Alat Baru</h3>
+                    <h3 id="toolModalTitle">Tambah Peralatan Baru</h3>
                     <button class="close-btn" onclick="closeToolModal()">
                         &times;
                     </button>
@@ -678,16 +684,16 @@
                     <input type="hidden" id="toolId" />
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="toolCode">Kode Alat *</label>
+                            <label for="toolCode">Serial Number *</label>
                             <input
                                 type="text"
                                 id="toolCode"
-                                name="tool_code"
+                                name="serial_number"
                                 required
                             />
                         </div>
                         <div class="form-group">
-                            <label for="toolName">Nama Alat *</label>
+                            <label for="toolName">Nama Barang *</label>
                             <input
                                 type="text"
                                 id="toolName"
@@ -709,14 +715,36 @@
                             <datalist id="categoryList"></datalist>
                         </div>
                         <div class="form-group">
-                            <label for="toolQuantity">Jumlah *</label>
+                            <label for="toolType">Jenis *</label>
+                            <input
+                                type="text"
+                                id="toolType"
+                                name="item_type"
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="toolPurchaseMonth">Bulan Pembelian</label>
                             <input
                                 type="number"
-                                id="toolQuantity"
-                                name="quantity"
+                                id="toolPurchaseMonth"
+                                name="purchase_month"
                                 min="1"
-                                value="1"
-                                required
+                                max="12"
+                                placeholder="1-12"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="toolPurchaseYear">Tahun Pembelian</label>
+                            <input
+                                type="number"
+                                id="toolPurchaseYear"
+                                name="purchase_year"
+                                min="1900"
+                                max="2999"
+                                placeholder="2026"
                             />
                         </div>
                     </div>
@@ -735,17 +763,9 @@
                                 <option value="rusak berat">Rusak Berat</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="toolLocation">Lokasi</label>
-                            <input
-                                type="text"
-                                id="toolLocation"
-                                name="location"
-                            />
-                        </div>
                     </div>
                     <div class="form-group">
-                        <label for="toolDescription">Deskripsi</label>
+                        <label for="toolDescription">Keterangan</label>
                         <textarea
                             id="toolDescription"
                             name="description"
@@ -781,7 +801,7 @@
         <div id="batchToolModal" class="modal">
             <div class="modal-content modal-large">
                 <div class="modal-header">
-                    <h3>Batch Add Alat</h3>
+                    <h3>Batch Add Peralatan</h3>
                     <button
                         class="close-btn"
                         onclick="closeBatchAddToolModal()"
@@ -791,7 +811,7 @@
                 </div>
                 <form id="batchToolForm">
                     <p class="batch-modal-description">
-                        Tambahkan banyak alat sekaligus. Setiap baris akan
+                        Tambahkan banyak peralatan sekaligus. Setiap baris akan
                         otomatis dibuatkan QR code.
                     </p>
                     <div class="batch-import-panel">
@@ -806,8 +826,9 @@
                             />
                             <small>
                                 Header yang didukung:
-                                `tool_code`, `name`, `category`, `quantity`,
-                                `condition`, `location`, `description`
+                                `serial_number`, `name`, `category`,
+                                `item_type`, `purchase_month`,
+                                `purchase_year`, `condition`, `description`
                             </small>
                         </div>
                         <button
@@ -831,13 +852,14 @@
                         <table class="batch-tool-table">
                             <thead>
                                 <tr>
-                                    <th>Kode Alat</th>
-                                    <th>Nama Alat</th>
+                                    <th>Serial Number</th>
+                                    <th>Nama Barang</th>
                                     <th>Kategori</th>
-                                    <th>Jumlah</th>
+                                    <th>Jenis</th>
+                                    <th>Bulan</th>
+                                    <th>Tahun</th>
                                     <th>Kondisi</th>
-                                    <th>Lokasi</th>
-                                    <th>Deskripsi</th>
+                                    <th>Keterangan</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -864,7 +886,7 @@
         <div id="toolDetailModal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Detail Alat</h3>
+                    <h3>Detail Peralatan</h3>
                     <button class="close-btn" onclick="closeToolDetailModal()">
                         &times;
                     </button>

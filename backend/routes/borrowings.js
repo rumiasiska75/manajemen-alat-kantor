@@ -113,7 +113,7 @@ router.get("/", authenticateToken, async (req, res) => {
     // Get items for each borrowing
     for (let borrowing of borrowings) {
       const items = await database.query(
-        `SELECT bi.*, t.name as tool_name, t.tool_code, t.category, t.image_path
+        `SELECT bi.*, t.name as tool_name, t.serial_number, t.serial_number as tool_code, t.category, t.item_type, t.image_path
          FROM borrowing_items bi
          JOIN tools t ON bi.tool_id = t.id
          WHERE bi.borrowing_id = ?`,
@@ -155,7 +155,7 @@ router.get("/active", authenticateToken, async (req, res) => {
     // Get items for each borrowing
     for (let borrowing of borrowings) {
       const items = await database.query(
-        `SELECT bi.*, t.name as tool_name, t.tool_code, t.category, t.image_path
+        `SELECT bi.*, t.name as tool_name, t.serial_number, t.serial_number as tool_code, t.category, t.item_type, t.image_path
          FROM borrowing_items bi
          JOIN tools t ON bi.tool_id = t.id
          WHERE bi.borrowing_id = ?`,
@@ -213,7 +213,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
 
     // Get borrowing items
     const items = await database.query(
-      `SELECT bi.*, t.name as tool_name, t.tool_code, t.category, t.image_path, t.qr_code_path
+      `SELECT bi.*, t.name as tool_name, t.serial_number, t.serial_number as tool_code, t.category, t.item_type, t.image_path, t.qr_code_path
        FROM borrowing_items bi
        JOIN tools t ON bi.tool_id = t.id
        WHERE bi.borrowing_id = ?`,
@@ -280,7 +280,7 @@ router.post(
         }
 
         const tool = await database.get(
-          "SELECT id, name, tool_code, available_quantity FROM tools WHERE id = ?",
+          "SELECT id, name, serial_number, available_quantity FROM tools WHERE id = ?",
           [item.tool_id],
         );
 
@@ -294,7 +294,7 @@ router.post(
         if (tool.available_quantity < item.quantity) {
           return res.status(400).json({
             success: false,
-            message: `Alat ${tool.name} tidak tersedia dalam jumlah yang diminta. Tersedia: ${tool.available_quantity}`,
+            message: `Peralatan ${tool.name} tidak tersedia dalam jumlah yang diminta. Tersedia: ${tool.available_quantity}`,
           });
         }
       }
@@ -368,7 +368,7 @@ router.post(
       );
 
       const items_data = await database.query(
-        `SELECT bi.*, t.name as tool_name, t.tool_code, t.category
+        `SELECT bi.*, t.name as tool_name, t.serial_number, t.serial_number as tool_code, t.category, t.item_type
        FROM borrowing_items bi
        JOIN tools t ON bi.tool_id = t.id
        WHERE bi.borrowing_id = ?`,
@@ -512,7 +512,7 @@ router.put(
       );
 
       const items_data = await database.query(
-        `SELECT bi.*, t.name as tool_name, t.tool_code, t.category
+        `SELECT bi.*, t.name as tool_name, t.serial_number, t.serial_number as tool_code, t.category, t.item_type
        FROM borrowing_items bi
        JOIN tools t ON bi.tool_id = t.id
        WHERE bi.borrowing_id = ?`,

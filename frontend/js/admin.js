@@ -68,6 +68,26 @@ let allBorrowings = [];
 let currentEditingTool = null;
 let selectedToolIds = new Set();
 
+function formatPurchasePeriod(month, year) {
+  if (!month || !year) return "-";
+  return `${String(month).padStart(2, "0")}/${year}`;
+}
+
+function getAvailabilityBadge(status) {
+  const normalizedStatus = status || "tersedia";
+  const statusConfig = {
+    tersedia: { class: "badge-success", text: "Tersedia" },
+    dipinjam: { class: "badge-warning", text: "Sedang Dipinjam" },
+  };
+
+  const config = statusConfig[normalizedStatus] || {
+    class: "badge-primary",
+    text: normalizedStatus,
+  };
+
+  return `<span class="badge ${config.class}">${config.text}</span>`;
+}
+
 /**
  * Load admin dashboard
  */
@@ -250,7 +270,7 @@ function displayTools(tools) {
   container.innerHTML = tools
     .map(
       (tool) => `
-        <div class="tool-card ${selectedToolIds.has(tool.id) ? "selected" : ""}" onclick="showToolDetail(${tool.id})">
+        <div class="tool-card inventory-card ${selectedToolIds.has(tool.id) ? "selected" : ""}" onclick="showToolDetail(${tool.id})">
             <input
                 type="checkbox"
                 class="tool-card-select"
@@ -263,14 +283,19 @@ function displayTools(tools) {
                 <div class="tool-card-header">
                     <div>
                         <div class="tool-card-title">${tool.name}</div>
-                        <div class="tool-card-code">#${tool.tool_code}</div>
+                        <div class="tool-card-code">SN-${tool.serial_number}</div>
                     </div>
-                    ${getConditionBadge(tool.condition)}
+                    ${getAvailabilityBadge(tool.availability_status)}
+                </div>
+                <div class="inventory-meta-row">
+                    <span>${tool.category}</span>
+                    <span>${tool.item_type || "-"}</span>
                 </div>
                 <div class="tool-card-info">
-                    <p><i class="fas fa-layer-group"></i> ${tool.category}</p>
-                    <p><i class="fas fa-boxes"></i> ${tool.available_quantity}/${tool.quantity} tersedia</p>
-                    ${tool.location ? `<p><i class="fas fa-map-marker-alt"></i> ${tool.location}</p>` : ""}
+                    <p><i class="fas fa-arrow-down"></i> Barang Masuk: ${tool.barang_masuk || 0}</p>
+                    <p><i class="fas fa-arrow-up"></i> Barang Keluar: ${tool.barang_keluar || 0}</p>
+                    <p><i class="fas fa-calendar-alt"></i> Pembelian: ${formatPurchasePeriod(tool.purchase_month, tool.purchase_year)}</p>
+                    <p><i class="fas fa-stethoscope"></i> ${tool.description || "Belum ada keterangan"}</p>
                 </div>
                 <div class="tool-card-footer">
                     <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); editTool(${tool.id})">
@@ -292,7 +317,7 @@ function updateSelectedToolsUI() {
   const toggleButton = document.getElementById("toggleSelectToolsButton");
 
   if (selectedCountElement) {
-    selectedCountElement.textContent = `${selectedToolIds.size} alat dipilih`;
+    selectedCountElement.textContent = `${selectedToolIds.size} item dipilih`;
   }
 
   if (toggleButton) {
@@ -398,7 +423,8 @@ async function loadCategories() {
  */
 function showAddToolModal() {
   currentEditingTool = null;
-  document.getElementById("toolModalTitle").textContent = "Tambah Alat Baru";
+  document.getElementById("toolModalTitle").textContent =
+    "Tambah Peralatan Baru";
   document.getElementById("toolForm").reset();
   document.getElementById("toolId").value = "";
   document.getElementById("toolModal").classList.add("active");
@@ -433,27 +459,30 @@ function closeBatchAddToolModal() {
 
 function normalizeImportedBatchRow(row = {}) {
   return {
-    tool_code: String(
-      row.tool_code ?? row.kode_alat ?? row.kode ?? row.code ?? "",
+    serial_number: String(
+      row.serial_number ??
+        row.tool_code ??
+        row.kode_alat ??
+        row.serial ??
+        row.kode ??
+        row.code ??
+        "",
     ).trim(),
-    name: String(
-      row.name ?? row.nama_alat ?? row.nama ?? "",
+    name: String(row.name ?? row.nama_barang ?? row.nama_alat ?? row.nama ?? "")
+      .trim(),
+    category: String(row.category ?? row.kategori ?? "").trim(),
+    item_type: String(row.item_type ?? row.jenis ?? "").trim(),
+    purchase_month: String(
+      row.purchase_month ?? row.bulan_pembelian ?? row.bulan ?? "",
     ).trim(),
-    category: String(
-      row.category ?? row.kategori ?? "",
+    purchase_year: String(
+      row.purchase_year ?? row.tahun_pembelian ?? row.tahun ?? "",
     ).trim(),
-    quantity:
-      parseInt(row.quantity ?? row.jumlah ?? row.qty ?? 1, 10) > 0
-        ? parseInt(row.quantity ?? row.jumlah ?? row.qty ?? 1, 10)
-        : 1,
-    condition: String(
-      row.condition ?? row.kondisi ?? "baik",
-    ).trim().toLowerCase() || "baik",
-    location: String(
-      row.location ?? row.lokasi ?? "",
-    ).trim(),
+    condition: String(row.condition ?? row.kondisi ?? "baik")
+      .trim()
+      .toLowerCase() || "baik",
     description: String(
-      row.description ?? row.deskripsi ?? "",
+      row.description ?? row.keterangan ?? row.deskripsi ?? "",
     ).trim(),
   };
 }
@@ -495,7 +524,10 @@ async function importBatchToolsFromFile() {
 
     const normalizedRows = rows
       .map(normalizeImportedBatchRow)
-      .filter((row) => row.tool_code || row.name || row.category);
+      .filter(
+        (row) =>
+          row.serial_number || row.name || row.category || row.item_type,
+      );
 
     if (normalizedRows.length === 0) {
       throw new Error("Tidak ada baris alat yang valid di file tersebut");
@@ -506,7 +538,7 @@ async function importBatchToolsFromFile() {
     normalizedRows.forEach((row) => addBatchToolRow(row));
 
     showToast(
-      `${normalizedRows.length} baris alat berhasil dimuat dari file`,
+      `${normalizedRows.length} baris peralatan berhasil dimuat dari file`,
       "success",
     );
   } catch (error) {
@@ -523,10 +555,12 @@ function addBatchToolRow(defaultValues = {}) {
 
   const row = document.createElement("tr");
   row.innerHTML = `
-    <td><input type="text" data-field="tool_code" value="${defaultValues.tool_code || ""}" required></td>
+    <td><input type="text" data-field="serial_number" value="${defaultValues.serial_number || ""}" required></td>
     <td><input type="text" data-field="name" value="${defaultValues.name || ""}" required></td>
     <td><input type="text" data-field="category" value="${defaultValues.category || ""}" list="categoryList" required></td>
-    <td><input type="number" data-field="quantity" value="${defaultValues.quantity || 1}" min="1" required></td>
+    <td><input type="text" data-field="item_type" value="${defaultValues.item_type || ""}" required></td>
+    <td><input type="number" data-field="purchase_month" value="${defaultValues.purchase_month || ""}" min="1" max="12" placeholder="MM"></td>
+    <td><input type="number" data-field="purchase_year" value="${defaultValues.purchase_year || ""}" min="1900" max="2999" placeholder="YYYY"></td>
     <td>
       <select data-field="condition">
         <option value="baik" ${defaultValues.condition === "rusak ringan" || defaultValues.condition === "rusak berat" ? "" : "selected"}>Baik</option>
@@ -534,7 +568,6 @@ function addBatchToolRow(defaultValues = {}) {
         <option value="rusak berat" ${defaultValues.condition === "rusak berat" ? "selected" : ""}>Rusak Berat</option>
       </select>
     </td>
-    <td><input type="text" data-field="location" value="${defaultValues.location || ""}"></td>
     <td><textarea data-field="description" rows="2">${defaultValues.description || ""}</textarea></td>
     <td>
       <button type="button" class="btn btn-danger btn-sm batch-remove-row" onclick="removeBatchToolRow(this)">
@@ -572,15 +605,17 @@ async function editTool(toolId) {
     if (response.success) {
       currentEditingTool = response.data;
 
-      document.getElementById("toolModalTitle").textContent = "Edit Alat";
+      document.getElementById("toolModalTitle").textContent = "Edit Peralatan";
       document.getElementById("toolId").value = response.data.id;
-      document.getElementById("toolCode").value = response.data.tool_code;
+      document.getElementById("toolCode").value = response.data.serial_number;
       document.getElementById("toolName").value = response.data.name;
       document.getElementById("toolCategory").value = response.data.category;
-      document.getElementById("toolQuantity").value = response.data.quantity;
+      document.getElementById("toolType").value = response.data.item_type || "";
+      document.getElementById("toolPurchaseMonth").value =
+        response.data.purchase_month || "";
+      document.getElementById("toolPurchaseYear").value =
+        response.data.purchase_year || "";
       document.getElementById("toolCondition").value = response.data.condition;
-      document.getElementById("toolLocation").value =
-        response.data.location || "";
       document.getElementById("toolDescription").value =
         response.data.description || "";
 
@@ -626,7 +661,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (response.success) {
           showToast(
-            toolId ? "Alat berhasil diperbarui" : "Alat berhasil ditambahkan",
+            toolId
+              ? "Peralatan berhasil diperbarui"
+              : "Peralatan berhasil ditambahkan",
             "success",
           );
           closeToolModal();
@@ -649,15 +686,28 @@ document.addEventListener("DOMContentLoaded", () => {
       const rows = document.querySelectorAll("#batchToolRows tr");
       const tools = Array.from(rows)
         .map((row) => ({
-          tool_code: row.querySelector('[data-field="tool_code"]').value.trim(),
+          serial_number: row
+            .querySelector('[data-field="serial_number"]')
+            .value.trim(),
           name: row.querySelector('[data-field="name"]').value.trim(),
           category: row.querySelector('[data-field="category"]').value.trim(),
-          quantity: row.querySelector('[data-field="quantity"]').value,
+          item_type: row.querySelector('[data-field="item_type"]').value.trim(),
+          purchase_month: row
+            .querySelector('[data-field="purchase_month"]')
+            .value.trim(),
+          purchase_year: row
+            .querySelector('[data-field="purchase_year"]')
+            .value.trim(),
           condition: row.querySelector('[data-field="condition"]').value,
-          location: row.querySelector('[data-field="location"]').value.trim(),
           description: row.querySelector('[data-field="description"]').value.trim(),
         }))
-        .filter((tool) => tool.tool_code || tool.name || tool.category);
+        .filter(
+          (tool) =>
+            tool.serial_number ||
+            tool.name ||
+            tool.category ||
+            tool.item_type,
+        );
 
       if (tools.length === 0) {
         showToast("Isi minimal satu baris batch add", "warning");
@@ -687,6 +737,39 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+async function exportAllToolsToExcel() {
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum siap", "error");
+    return;
+  }
+
+  try {
+    showLoading();
+
+    const response = await apiRequest(API_ENDPOINTS.TOOLS.EXPORT_ALL, {
+      method: "GET",
+    });
+
+    if (!response.success || !response.data?.length) {
+      showToast("Tidak ada data peralatan untuk diexport", "warning");
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(response.data);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Peralatan");
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `audit-peralatan-${today}.xlsx`);
+    showToast("Export Excel berhasil dibuat", "success");
+  } catch (error) {
+    console.error("Error exporting tools:", error);
+    showToast(error.message || "Gagal export Excel", "error");
+  } finally {
+    hideLoading();
+  }
+}
+
 /**
  * Delete tool
  */
@@ -703,7 +786,7 @@ async function deleteTool(toolId) {
     });
 
     if (response.success) {
-      showToast("Alat berhasil dihapus", "success");
+      showToast("Peralatan berhasil dihapus", "success");
       loadTools();
     }
   } catch (error) {
@@ -780,9 +863,9 @@ function printSelectedToolQRCodes() {
     .map(
       (tool) => `
         <article class="print-card">
-          <img src="${getImageUrl(tool.qr_code_path)}" alt="QR ${tool.tool_code}">
+          <img src="${getImageUrl(tool.qr_code_path)}" alt="QR ${tool.serial_number}">
           <h3>${tool.name}</h3>
-          <p>${tool.tool_code}</p>
+          <p>${tool.serial_number}</p>
         </article>
       `,
     )
@@ -847,8 +930,8 @@ function printSelectedToolQRCodes() {
       </head>
       <body>
         <header class="print-header">
-          <h1>Batch Print QR Code Alat</h1>
-          <p>${printableTools.length} alat siap dicetak</p>
+          <h1>Batch Print QR Code Peralatan</h1>
+          <p>${printableTools.length} item siap dicetak</p>
         </header>
         <section class="print-grid">${cardsHtml}</section>
       </body>
@@ -880,11 +963,11 @@ async function showToolDetail(toolId) {
 
                 <div class="tool-detail-grid">
                     <div class="detail-item">
-                        <label>Kode Alat</label>
-                        <p>${tool.tool_code}</p>
+                        <label>Serial Number</label>
+                        <p>${tool.serial_number}</p>
                     </div>
                     <div class="detail-item">
-                        <label>Nama Alat</label>
+                        <label>Nama Barang</label>
                         <p>${tool.name}</p>
                     </div>
                     <div class="detail-item">
@@ -892,27 +975,29 @@ async function showToolDetail(toolId) {
                         <p>${tool.category}</p>
                     </div>
                     <div class="detail-item">
+                        <label>Jenis</label>
+                        <p>${tool.item_type || "-"}</p>
+                    </div>
+                    <div class="detail-item">
+                        <label>Barang Masuk</label>
+                        <p>${tool.barang_masuk || 0}</p>
+                    </div>
+                    <div class="detail-item">
+                        <label>Barang Keluar</label>
+                        <p>${tool.barang_keluar || 0}</p>
+                    </div>
+                    <div class="detail-item">
+                        <label>Pembelian</label>
+                        <p>${formatPurchasePeriod(tool.purchase_month, tool.purchase_year)}</p>
+                    </div>
+                    <div class="detail-item">
+                        <label>Status</label>
+                        <p>${getAvailabilityBadge(tool.availability_status)}</p>
+                    </div>
+                    <div class="detail-item">
                         <label>Kondisi</label>
                         <p>${getConditionBadge(tool.condition)}</p>
                     </div>
-                    <div class="detail-item">
-                        <label>Jumlah Total</label>
-                        <p>${tool.quantity}</p>
-                    </div>
-                    <div class="detail-item">
-                        <label>Tersedia</label>
-                        <p>${tool.available_quantity}</p>
-                    </div>
-                    ${
-                      tool.location
-                        ? `
-                    <div class="detail-item">
-                        <label>Lokasi</label>
-                        <p>${tool.location}</p>
-                    </div>
-                    `
-                        : ""
-                    }
                     <div class="detail-item">
                         <label>Dibuat oleh</label>
                         <p>${tool.created_by_name || tool.created_by_username || "-"}</p>
@@ -923,7 +1008,7 @@ async function showToolDetail(toolId) {
                   tool.description
                     ? `
                 <div class="detail-item" style="grid-column: 1 / -1;">
-                    <label>Deskripsi</label>
+                    <label>Keterangan</label>
                     <p>${tool.description}</p>
                 </div>
                 `
@@ -937,7 +1022,7 @@ async function showToolDetail(toolId) {
                     <label>QR Code</label>
                     <img src="${getImageUrl(tool.qr_code_path)}" alt="QR Code">
                     <p style="margin-top: 10px;">
-                        <button class="btn btn-sm btn-primary" onclick="downloadQRCode('${getImageUrl(tool.qr_code_path)}', '${tool.tool_code}')">
+                        <button class="btn btn-sm btn-primary" onclick="downloadQRCode('${getImageUrl(tool.qr_code_path)}', '${tool.serial_number}')">
                             <i class="fas fa-download"></i> Download QR Code
                         </button>
                     </p>
@@ -1151,7 +1236,7 @@ async function showBorrowingDetail(borrowingId) {
                                 <div style="flex: 1;">
                                     <strong>${item.tool_name}</strong>
                                     <p style="font-size: 12px; color: var(--text-secondary);">
-                                        Kode: ${item.tool_code} | Jumlah: ${item.quantity}
+                                        Serial: ${item.serial_number || item.tool_code} | Jumlah: ${item.quantity}
                                     </p>
                                     <p style="font-size: 12px;">
                                         Kondisi Awal: ${getConditionBadge(item.condition_before)}

@@ -20,6 +20,7 @@ const API_ENDPOINTS = {
     BY_CODE: (code) => `${API_BASE_URL}/tools/code/${code}`,
     CATEGORIES: `${API_BASE_URL}/tools/categories/list`,
     REGENERATE_QR: (id) => `${API_BASE_URL}/tools/${id}/regenerate-qr`,
+    EXPORT_ALL: `${API_BASE_URL}/tools/export/all`,
   },
   // Borrowings endpoints
   BORROWINGS: {

@@ -280,12 +280,15 @@ async function onScanSuccess(decodedText, decodedResult) {
     // Parse QR code data
     const qrData = JSON.parse(decodedText);
 
-    if (qrData.tool_id && qrData.tool_code) {
+    if (qrData.tool_id && (qrData.serial_number || qrData.tool_code)) {
       // Stop scanner temporarily
       await stopQRScanner();
 
       // Fetch tool details
-      await addToolToCart(qrData.tool_id, qrData.tool_code);
+      await addToolToCart(
+        qrData.tool_id,
+        qrData.serial_number || qrData.tool_code,
+      );
     } else {
       showToast("QR Code tidak valid", "error");
     }
@@ -340,9 +343,10 @@ async function addToolToCart(toolId, toolCode) {
       // Add to cart
       borrowCart.push({
         tool_id: tool.id,
-        tool_code: tool.tool_code,
+        serial_number: tool.serial_number || tool.tool_code,
         name: tool.name,
         category: tool.category,
+        item_type: tool.item_type,
         image_path: tool.image_path,
         quantity: 1,
         condition_before: tool.condition,
@@ -373,7 +377,7 @@ async function addToolByCode(toolCode) {
 
     if (response.success) {
       const tool = response.data;
-      await addToolToCart(tool.id, tool.tool_code);
+      await addToolToCart(tool.id, tool.serial_number || tool.tool_code);
     }
   } catch (error) {
     console.error("Error adding tool by code:", error);
@@ -451,8 +455,8 @@ function displayCart() {
             <img src="${getImageUrl(item.image_path)}" alt="${item.name}" class="cart-item-image" onload="markImageAsLoaded(this)" onerror="handleImageError(this)">
             <div class="cart-item-info">
                 <div class="cart-item-name">${item.name}</div>
-                <div class="cart-item-code">#${item.tool_code}</div>
-                <small>${item.category}</small>
+                <div class="cart-item-code">SN-${item.serial_number}</div>
+                <small>${item.category}${item.item_type ? ` • ${item.item_type}` : ""}</small>
             </div>
             <button class="cart-item-remove" onclick="removeFromCart(${index})">
                 <i class="fas fa-times"></i>

@@ -31,6 +31,7 @@ class Database {
     try {
       await this.connect();
       await this.createTables();
+      await this.migrateToolsSchema();
       await this.createDefaultAdmin();
       console.log('Database initialized successfully');
     } catch (error) {
@@ -64,14 +65,16 @@ class Database {
         this.db.run(`
           CREATE TABLE IF NOT EXISTS tools (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tool_code TEXT UNIQUE NOT NULL,
+            serial_number TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
+            item_type TEXT,
             description TEXT,
+            purchase_month INTEGER,
+            purchase_year INTEGER,
             quantity INTEGER NOT NULL DEFAULT 1,
             available_quantity INTEGER NOT NULL DEFAULT 1,
             condition TEXT CHECK(condition IN ('baik', 'rusak ringan', 'rusak berat')) DEFAULT 'baik',
-            location TEXT,
             qr_code_path TEXT,
             image_path TEXT,
             created_by INTEGER,
@@ -146,6 +149,114 @@ class Database {
         });
       });
     });
+  }
+
+  async migrateToolsSchema() {
+    const columns = await this.query(`PRAGMA table_info(tools)`);
+    if (!columns || columns.length === 0) {
+      return;
+    }
+
+    const columnNames = columns.map((column) => column.name);
+
+    if (columnNames.includes('tool_code')) {
+      await this.run('PRAGMA foreign_keys = OFF');
+      await this.run('BEGIN TRANSACTION');
+
+      try {
+        await this.run(`
+          CREATE TABLE tools_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            serial_number TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            item_type TEXT,
+            description TEXT,
+            purchase_month INTEGER,
+            purchase_year INTEGER,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            available_quantity INTEGER NOT NULL DEFAULT 1,
+            condition TEXT CHECK(condition IN ('baik', 'rusak ringan', 'rusak berat')) DEFAULT 'baik',
+            qr_code_path TEXT,
+            image_path TEXT,
+            created_by INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (created_by) REFERENCES users(id)
+          )
+        `);
+
+        await this.run(`
+          INSERT INTO tools_new (
+            id,
+            serial_number,
+            name,
+            category,
+            item_type,
+            description,
+            purchase_month,
+            purchase_year,
+            quantity,
+            available_quantity,
+            condition,
+            qr_code_path,
+            image_path,
+            created_by,
+            created_at,
+            updated_at
+          )
+          SELECT
+            id,
+            tool_code,
+            name,
+            category,
+            COALESCE(NULLIF(location, ''), category),
+            description,
+            NULL,
+            NULL,
+            COALESCE(quantity, 1),
+            COALESCE(available_quantity, quantity, 1),
+            COALESCE(condition, 'baik'),
+            qr_code_path,
+            image_path,
+            created_by,
+            created_at,
+            updated_at
+          FROM tools
+        `);
+
+        await this.run('DROP TABLE tools');
+        await this.run('ALTER TABLE tools_new RENAME TO tools');
+        await this.run('COMMIT');
+      } catch (error) {
+        await this.run('ROLLBACK');
+        throw error;
+      } finally {
+        await this.run('PRAGMA foreign_keys = ON');
+      }
+
+      return;
+    }
+
+    const addColumnStatements = [];
+
+    if (!columnNames.includes('item_type')) {
+      addColumnStatements.push(`ALTER TABLE tools ADD COLUMN item_type TEXT`);
+    }
+    if (!columnNames.includes('purchase_month')) {
+      addColumnStatements.push(
+        `ALTER TABLE tools ADD COLUMN purchase_month INTEGER`,
+      );
+    }
+    if (!columnNames.includes('purchase_year')) {
+      addColumnStatements.push(
+        `ALTER TABLE tools ADD COLUMN purchase_year INTEGER`,
+      );
+    }
+
+    for (const statement of addColumnStatements) {
+      await this.run(statement);
+    }
   }
 
   // Create default admin account
